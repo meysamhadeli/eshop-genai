@@ -21,7 +21,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Baskets\Enums\" />
     <Folder Include="Baskets\Exceptions\" />
     <Folder Include="GrpcClient\Protos\" />
   </ItemGroup>

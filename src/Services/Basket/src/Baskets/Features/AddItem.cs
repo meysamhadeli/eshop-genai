@@ -56,7 +56,6 @@ public class AddItemCommandHandler : IRequestHandler<AddItem, BasketDto>
                                  ProductId = request.ProductId,
                                  Quantity = request.Quantity,
                                  BasketId = basket.Id,
-                                 LastModified = DateTime.UtcNow,
                              });
             
             _context.Baskets.Update(basket);
@@ -64,8 +63,6 @@ public class AddItemCommandHandler : IRequestHandler<AddItem, BasketDto>
         else if (existingItem != null)
         {
             existingItem.Quantity += request.Quantity;
-            existingItem.LastModified = DateTime.UtcNow;
-            
             _context.Baskets.Update(basket);
         }
         

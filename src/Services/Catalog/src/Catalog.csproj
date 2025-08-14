@@ -21,8 +21,4 @@
     <ProjectReference Include="..\..\..\Aspire\src\ServiceDefaults\ServiceDefaults.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Products\Enums\" />
-  </ItemGroup>
-
 </Project>

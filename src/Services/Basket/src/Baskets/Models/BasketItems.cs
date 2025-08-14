@@ -1,8 +1,6 @@
-using BuildingBlocks.Core.Model;
-
 namespace Basket.Baskets.Models;
 
-public record BasketItems: Entity<Guid>
+public record BasketItems
 {
     public Guid BasketId { get; set; }
     public Guid ProductId { get; set; }
