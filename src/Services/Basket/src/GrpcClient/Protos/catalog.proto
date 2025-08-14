@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package catalog;
+import "google/protobuf/timestamp.proto";
+
+service CatalogGrpcService {
+  rpc GetProductById (GetProductByIdRequest) returns (GetProductByIdResult);
+}
+
+message GetProductByIdRequest {
+  string Id = 1;
+}
+
+message GetProductByIdResult{
+  ProductResponse ProductDto = 1;
+}
+
+message ProductResponse {
+  string Id = 1;
+  string Name = 2;
+  string Description = 3;
+  double Price = 4;
+  string ImageUrl = 5;
+  google.protobuf.Timestamp CreatedAt = 6;
+  google.protobuf.Timestamp LastModified = 7; 
+}
