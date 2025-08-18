@@ -1,5 +1,5 @@
 import axios, { AxiosError } from 'axios';
-import type { ProblemDetails } from '@/shared/models/problem-details';
+import type { ProblemDetails } from '@/shared/models/ProblemDetails';
 import { showErrorToast } from '@/shared/lib/toast';
 
 export const api = axios.create({

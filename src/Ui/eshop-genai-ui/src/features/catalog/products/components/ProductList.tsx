@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { fetchProducts } from '@/features/catalog/products/services/productService'
+import { fetchProducts } from '@/features/catalog/products/services/product-service'
 import ProductCard from '@/features/catalog/products/components/ProductCard'
 import { useState } from 'react'
 import type { ProductDto } from '@/features/catalog/products/models/ProductDto'

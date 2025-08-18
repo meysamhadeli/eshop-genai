@@ -1,4 +1,4 @@
-import type { ProblemDetails } from '@/shared/models/problem-details';
+import type { ProblemDetails } from '@/shared/models/ProblemDetails';
 import { toast } from 'react-toastify';
 
 export function showErrorToast(problemDetails: ProblemDetails): void {
