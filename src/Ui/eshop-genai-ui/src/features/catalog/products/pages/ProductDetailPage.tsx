@@ -1,12 +1,12 @@
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { fetchProductById } from '@/features/catalog/products/services/productService'
+import { fetchProductById } from '@/features/catalog/products/services/product-service'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import type { ProductDto } from '@/features/catalog/products/models/ProductDto'
 import { api } from '@/shared/lib/api-client'
 import fallbackImg from '@/assets/images/default_product.jpg'
-import { fetchBasket } from '@/features/basket/baskets/services/basketService'
+import { fetchBasket } from '@/features/basket/baskets/services/basket-service'
 
 // Price formatting utility
 const formatPrice = (price: number) => {

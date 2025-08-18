@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { FaShoppingCart } from 'react-icons/fa'
-import { fetchBasket } from '@/features/basket/baskets/services/basketService'
+import { fetchBasket } from '@/features/basket/baskets/services/basket-service'
 
 export default function Header() {
   const navigate = useNavigate()

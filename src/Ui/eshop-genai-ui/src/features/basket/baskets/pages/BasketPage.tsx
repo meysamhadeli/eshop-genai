@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchBasket } from '@/features/basket/baskets/services/basketService'
+import { fetchBasket } from '@/features/basket/baskets/services/basket-service'
 import BasketItem from '@/features/basket/baskets/components/BasketItem'
 import { api } from '@/shared/lib/api-client'
 import type { BasketDto } from '@/features/basket/baskets/models/BasketDto'
