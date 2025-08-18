@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
-import { fetchProducts } from '@/features/catalog/products/api/productService'
+import { fetchProducts } from '@/features/catalog/products/services/productService'
 import ProductCard from '@/features/catalog/products/components/ProductCard'
 import { useState } from 'react'
-import type { ProductDto } from '@/entities/ProductDto'
+import type { ProductDto } from '@/features/catalog/products/models/ProductDto'
 
 export default function ProductList() {
   const [search, setSearch] = useState('')

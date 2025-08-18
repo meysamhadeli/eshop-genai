@@ -1,5 +1,5 @@
-import type { BasketDto } from "@/entities/BasketDto"
-import { api } from "@/shared/lib/axiosInstance"
+import type { BasketDto } from "@/features/basket/baskets/models/BasketDto"
+import { api } from "@/shared/lib/api-client"
 
 
 export const fetchBasket = (userId = 'user-123') =>
