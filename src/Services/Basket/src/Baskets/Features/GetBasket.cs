@@ -1,6 +1,7 @@
 using Basket.Baskets.Dtos;
 using Basket.Data;
 using BuildingBlocks.Web;
+using Catalog;
 using MapsterMapper;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -12,12 +13,12 @@ public record GetBasketQuery(string UserId) : IRequest<BasketDto>;
 public class GetBasketQueryHandler : IRequestHandler<GetBasketQuery, BasketDto>
 {
     private readonly BasketDbContext _context;
-    private readonly IMapper _mapper;
+    private readonly CatalogGrpcService.CatalogGrpcServiceClient _catalogGrpcServiceClient;
 
-    public GetBasketQueryHandler(BasketDbContext context, IMapper mapper)
+    public GetBasketQueryHandler(BasketDbContext context, IMapper mapper, CatalogGrpcService.CatalogGrpcServiceClient catalogGrpcServiceClient)
     {
         _context = context;
-        _mapper = mapper;
+        _catalogGrpcServiceClient = catalogGrpcServiceClient;
     }
 
     public async Task<BasketDto> Handle(
@@ -28,14 +29,16 @@ public class GetBasketQueryHandler : IRequestHandler<GetBasketQuery, BasketDto>
                          .Include(b => b.Items)
                          .FirstOrDefaultAsync(b => b.UserId == request.UserId, cancellationToken);
 
-        if (basket == null)
-        {
-            basket = new Basket.Baskets.Models.Basket { UserId = request.UserId };
-            _context.Baskets.Add(basket);
-            await _context.SaveChangesAsync(cancellationToken);
-        }
+        BasketDto basketDto = new BasketDto(basket.Id, basket.UserId, new List<BasketItemsDto>(), (DateTime)basket.CreatedAt, basket.LastModified);
 
-        return _mapper.Map<BasketDto>(basket);
+        foreach (var item in basket.Items)
+        {
+           var product = await _catalogGrpcServiceClient.GetProductByIdAsync(new GetProductByIdRequest(){Id = item.ProductId.ToString()});
+           var basketItem = basket.Items.First(x => x.ProductId == new Guid(product.ProductDto.Id));
+           basketDto.Items.Add(new BasketItemsDto(Guid.CreateVersion7(), basketItem.ProductId, product.ProductDto.Name, (decimal)product.ProductDto.Price, product.ProductDto.ImageUrl, basketItem.Quantity, DateTime.Now));
+        }
+        
+        return basketDto;
     }
 }
 

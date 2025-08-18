@@ -19,6 +19,19 @@ public static class InfrastructureExtensions
     {
         var configuration = builder.Configuration;
         var env = builder.Environment;
+        
+        var appOptions = builder.Services.GetOptions<AppOptions>(nameof(AppOptions));
+        Console.WriteLine(FiggleFonts.Standard.Render(appOptions.Name));
+        
+        builder.Services.AddCors(options =>
+                                 {
+                                     options.AddPolicy("AllowFrontend",
+                                         builder => builder
+                                             .WithOrigins(appOptions.UiUrl)
+                                             .AllowAnyMethod()
+                                             .AllowAnyHeader()
+                                             .AllowCredentials());
+                                 });
 
         builder.AddServiceDefaults();
 
@@ -30,9 +43,6 @@ public static class InfrastructureExtensions
         builder.Services.AddCustomMediatR();
         builder.Services.AddProblemDetails();
         builder.Services.AddJwt();
-
-        var appOptions = builder.Services.GetOptions<AppOptions>(nameof(AppOptions));
-        Console.WriteLine(FiggleFonts.Standard.Render(appOptions.Name));
 
         builder.AddCustomDbContext<BasketDbContext>(nameof(Basket));
         builder.Services.AddEndpointsApiExplorer();
@@ -54,6 +64,8 @@ public static class InfrastructureExtensions
     {
         var env = app.Environment;
         var appOptions = app.GetOptions<AppOptions>(nameof(AppOptions));
+        
+        app.UseCors("AllowFrontend");
 
         app.UseAuthentication();
         app.UseAuthorization();

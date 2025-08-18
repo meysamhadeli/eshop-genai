@@ -225,8 +225,8 @@ var catalog = builder.AddProject<Projects.Catalog>("catalog-service")
 var basket = builder.AddProject<Projects.Basket>("basket-service")
     .WithReference(basketDb)
     .WaitFor(basketDb)
-    .WithHttpEndpoint(port: 6010, name: "booking-http")
-    .WithHttpsEndpoint(port: 5010, name: "booking-https");
+    .WithHttpEndpoint(port: 6010, name: "basket-http")
+    .WithHttpsEndpoint(port: 5010, name: "basket-https");
 
 var gateway = builder.AddProject<Projects.ApiGateway>("api-gateway")
     .WithReference(catalog)

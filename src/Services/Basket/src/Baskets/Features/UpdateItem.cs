@@ -12,19 +12,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Basket.Baskets.Features;
 
-public record AddItem(
+public record UpdateItem(
     string UserId,
     Guid ProductId,
-    int Quantity = 1) : IRequest<BasketDto>;
+    int Quantity = 0) : IRequest<BasketDto>;
 
 
-public class AddItemCommandHandler : IRequestHandler<AddItem, BasketDto>
+public class UpdateItemCommandHandler : IRequestHandler<UpdateItem, BasketDto>
 {
     private readonly BasketDbContext _context;
     private readonly CatalogGrpcService.CatalogGrpcServiceClient _catalogGrpcServiceClient;
     private readonly IMapper _mapper;
 
-    public AddItemCommandHandler(BasketDbContext context, IMapper mapper, CatalogGrpcService.CatalogGrpcServiceClient catalogGrpcServiceClient)
+    public UpdateItemCommandHandler(BasketDbContext context, IMapper mapper, CatalogGrpcService.CatalogGrpcServiceClient catalogGrpcServiceClient)
     {
         _context = context;
         _mapper = mapper;
@@ -32,40 +32,63 @@ public class AddItemCommandHandler : IRequestHandler<AddItem, BasketDto>
     }
 
     public async Task<BasketDto> Handle(
-        AddItem request,
+        UpdateItem request,
         CancellationToken cancellationToken)
     {
-        var basket = await _context.Baskets
-                         .Include(b => b.Items)
-                         .FirstOrDefaultAsync(b => b.UserId == request.UserId, cancellationToken) 
-                     ?? new Basket.Baskets.Models.Basket { UserId = request.UserId };
+         // Validate input
+        if (string.IsNullOrWhiteSpace(request.UserId))
+            throw new ArgumentException("User ID is required.");
 
-        var product =  _catalogGrpcServiceClient.GetProductById(new GetProductByIdRequest{Id = request.ProductId.ToString()});
+        if (request.Quantity < 0)
+            throw new ArgumentException("Quantity cannot be negative.");
+
+        // Load or create basket
+        var basket = await _context.Baskets
+            .Include(b => b.Items)
+            .FirstOrDefaultAsync(b => b.UserId == request.UserId, cancellationToken);
+
+        if (basket == null)
+        {
+            basket = new Basket.Baskets.Models.Basket { UserId = request.UserId };
+            _context.Baskets.Add(basket);
+        }
+
+        var existingItem = basket.Items.FirstOrDefault(i => i.ProductId == request.ProductId);
+        
+        var product = await _catalogGrpcServiceClient.GetProductByIdAsync(
+                new GetProductByIdRequest { Id = request.ProductId.ToString() },
+                cancellationToken: cancellationToken);
+  
 
         if (product == null)
         {
             throw new ProductNotFoundException();
         }
 
-        var existingItem = basket?.Items?.FirstOrDefault(i => i.ProductId == request.ProductId);
-
         if (existingItem == null)
         {
-            basket.Items.Add(new BasketItems
-                             {
-                                 ProductId = request.ProductId,
-                                 Quantity = request.Quantity,
-                                 BasketId = basket.Id,
-                             });
-            
-            _context.Baskets.Update(basket);
+            if (request.Quantity > 0)
+            {
+                basket.Items.Add(new BasketItems
+                {
+                    ProductId = request.ProductId,
+                    Quantity = request.Quantity,
+                    BasketId = basket.Id,
+                });
+            }
         }
-        else if (existingItem != null)
+        else
         {
-            existingItem.Quantity += request.Quantity;
-            _context.Baskets.Update(basket);
+            if (request.Quantity > 0)
+            {
+                existingItem.Quantity = request.Quantity;
+            }
+            else
+            {
+                basket.Items.Remove(existingItem);
+            }
         }
-        
+
         await _context.SaveChangesAsync(cancellationToken);
 
         return _mapper.Map<BasketDto>(basket);
@@ -77,20 +100,20 @@ public class AddBasketEndpoints: IMinimalEndpoint
 {
     public IEndpointRouteBuilder MapEndpoint(IEndpointRouteBuilder builder)
     {
-        builder.MapPost($"{EndpointConfig.BaseApiPath}/basket", async (
-                                                                    AddItem command,
+        builder.MapPut($"{EndpointConfig.BaseApiPath}/basket", async (
+                                                                    UpdateItem command,
                                                                     IMediator mediator,
                                                                     CancellationToken cancellationToken) =>
                                                                 {
                                                                     var result = await mediator.Send(command, cancellationToken);
                                                                     return Results.Ok(result);
                                                                 })
-            .WithName("AddItem")
+            .WithName("UpdateItem")
             .WithApiVersionSet(builder.NewApiVersionSet("Basket").Build())
             .Produces<BasketDto>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
-            .WithSummary("Add Item")
-            .WithDescription("Add Item to Basket")
+            .WithSummary("Update Item")
+            .WithDescription("Update Basket Items")
             .WithOpenApi()
             .HasApiVersion(1.0);
         

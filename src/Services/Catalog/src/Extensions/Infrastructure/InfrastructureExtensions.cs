@@ -8,6 +8,7 @@ using BuildingBlocks.Web;
 using Catalog.Data;
 using Catalog.GrpcServer.Services;
 using Figgle;
+using Flight.Data.Seed;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 
@@ -20,6 +21,19 @@ public static class InfrastructureExtensions
     {
         var configuration = builder.Configuration;
         var env = builder.Environment;
+        
+        var appOptions = builder.Services.GetOptions<AppOptions>(nameof(AppOptions));
+        Console.WriteLine(FiggleFonts.Standard.Render(appOptions.Name));
+        
+        builder.Services.AddCors(options =>
+                                 {
+                                     options.AddPolicy("AllowFrontend",
+                                         builder => builder
+                                             .WithOrigins(appOptions.UiUrl)
+                                             .AllowAnyMethod()
+                                             .AllowAnyHeader()
+                                             .AllowCredentials());
+                                 });
 
         builder.AddServiceDefaults();
 
@@ -32,10 +46,8 @@ public static class InfrastructureExtensions
         builder.Services.AddProblemDetails();
         builder.Services.AddJwt();
 
-        var appOptions = builder.Services.GetOptions<AppOptions>(nameof(AppOptions));
-        Console.WriteLine(FiggleFonts.Standard.Render(appOptions.Name));
-
         builder.AddCustomDbContext<CatalogDbContext>(nameof(Catalog));
+        builder.Services.AddScoped<IDataSeeder, CatalogDataSeeder>();
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddAspnetOpenApi();
         builder.Services.AddCustomVersioning();
@@ -58,6 +70,9 @@ public static class InfrastructureExtensions
     {
         var env = app.Environment;
         var appOptions = app.GetOptions<AppOptions>(nameof(AppOptions));
+        
+        app.UseCors("AllowFrontend");
+        app.UseStaticFiles();
 
         app.UseAuthentication();
         app.UseAuthorization();
