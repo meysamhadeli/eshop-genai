@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchBasket } from '@/features/basket/baskets/api/basketService'
+import { fetchBasket } from '@/features/basket/baskets/services/basketService'
 import BasketItem from '@/features/basket/baskets/components/BasketItem'
-import { api } from '@/shared/lib/axiosInstance'
-import type { BasketDto } from '@/entities/BasketDto'
+import { api } from '@/shared/lib/api-client'
+import type { BasketDto } from '@/features/basket/baskets/models/BasketDto'
 import { FaCreditCard } from 'react-icons/fa'
 
 export default function BasketPage() {

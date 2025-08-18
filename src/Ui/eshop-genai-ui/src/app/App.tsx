@@ -1,6 +1,6 @@
 import { RouterProvider, createBrowserRouter } from 'react-router-dom'
-import { routes } from './routes'
-import Layout from '../features/layout/Layout'
+import { routes } from '@/app/routes'
+import Layout from '@/shared/components/Layout'
 
 const router = createBrowserRouter(
   routes.map(route => ({

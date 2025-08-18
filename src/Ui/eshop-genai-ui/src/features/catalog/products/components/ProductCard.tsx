@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { ProductDto } from '@/entities/ProductDto'
-import { api } from '@/shared/lib/axiosInstance'
+import type { ProductDto } from '@/features/catalog/products/models/ProductDto'
+import { api } from '@/shared/lib/api-client'
 import fallbackImg from '@/assets/images/default_product.jpg';
 
 // Price formatting utility (can be moved to a shared utils file if used elsewhere)
