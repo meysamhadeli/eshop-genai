@@ -4,9 +4,8 @@ import { fetchProductById } from '@/features/catalog/products/services/product-s
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import type { ProductDto } from '@/features/catalog/products/models/ProductDto'
-import { api } from '@/shared/lib/api-client'
 import fallbackImg from '@/assets/images/default_product.jpg'
-import { fetchBasket } from '@/features/basket/baskets/services/basket-service'
+import { fetchBasket, updateBasketItem } from '@/features/basket/baskets/services/basket-service'
 
 // Price formatting utility
 const formatPrice = (price: number) => {
@@ -55,12 +54,7 @@ export default function ProductDetailPage() {
   }, [basket, id])
 
   const updateBasket = useMutation({
-    mutationFn: (qty: number) =>
-      api.put(`basket/api/v1/basket`, {
-        userId: 'user-123',
-        productId: id!,
-        quantity: qty,
-      }),
+    mutationFn: (qty: number) =>  updateBasketItem(id!, qty),
     onSuccess: () => {
       queryClient.refetchQueries({ queryKey: ['basket'] })
     },

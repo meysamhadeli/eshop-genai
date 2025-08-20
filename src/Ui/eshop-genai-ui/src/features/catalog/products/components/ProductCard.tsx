@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ProductDto } from '@/features/catalog/products/models/ProductDto'
-import { api } from '@/shared/lib/api-client'
 import fallbackImg from '@/assets/images/default_product.jpg';
+import { updateBasketItem } from '@/features/basket/baskets/services/basket-service';
 
 // Price formatting utility (can be moved to a shared utils file if used elsewhere)
 const formatPrice = (price: number) => {
@@ -20,13 +20,8 @@ interface Props {
 export default function ProductCard({ product }: Props) {
   const queryClient = useQueryClient()
 
-  const addToBasket = useMutation({
-    mutationFn: () =>
-      api.post('/api/v1/basket', {
-        userId: 'user-123',
-        productId: product.id,
-        quantity: 1, // Changed from 0 to 1 as default add to cart quantity
-      }),
+  const updateBasket = useMutation({
+    mutationFn: () => updateBasketItem(product.id, 1),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['basket'] })
     },

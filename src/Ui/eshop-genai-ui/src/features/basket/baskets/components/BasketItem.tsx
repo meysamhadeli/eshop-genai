@@ -18,7 +18,7 @@ export default function BasketItem({ item, onUpdate }: Props) {
       {/* Product Image */}
       <div className="h-20 w-20 flex-shrink-0">
         <img
-          src={item.productImageUrl || fallbackImg}
+          src={item?.productImageUrl ? `${import.meta.env.VITE_GATEWAY_BASE_URL}/catalog/${item?.productImageUrl}` : fallbackImg}
           alt={item.productName}
           className="h-full w-full object-cover rounded"
         />
