@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchBasket } from '@/features/basket/baskets/services/basket-service'
+import { fetchBasket, updateBasketItem } from '@/features/basket/baskets/services/basket-service'
 import BasketItem from '@/features/basket/baskets/components/BasketItem'
-import { api } from '@/shared/lib/api-client'
 import type { BasketDto } from '@/features/basket/baskets/models/BasketDto'
 import { FaCreditCard } from 'react-icons/fa'
 
@@ -23,21 +22,10 @@ export default function BasketPage() {
   var basket = data
 
   const updateMutation = useMutation({
-    mutationFn: ({ productId, quantity }: { productId: string; quantity: number }) => {
-      console.log('🚀 Updating basket item:', { productId, quantity })
-      return api.put('basket/api/v1/basket', {
-        userId: 'user-123',
-        productId,
-        quantity,
-      })
-    },
+    mutationFn: ({ productId, quantity }: { productId: string; quantity: number }) => updateBasketItem(productId, quantity),
     onSuccess: () => {
-      console.log('✅ Basket updated')
       queryClient.refetchQueries({ queryKey: ['basket'] })
-    },
-    onError: (err: any) => {
-      console.error('❌ API Error:', err.message)
-    },
+    }
   })
 
   if (isLoading) return <p className="text-center py-6">Loading your basket...</p>
