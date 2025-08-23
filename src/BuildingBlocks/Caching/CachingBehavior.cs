@@ -1,4 +1,3 @@
-using EasyCaching.Core;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
@@ -8,15 +7,16 @@ public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
     where TRequest : notnull, IRequest<TResponse>
     where TResponse : notnull
 {
-    private readonly IEasyCachingProvider _cachingProvider;
+    private readonly IHybridCacheProvider _cacheProvider;
     private readonly ILogger<CachingBehavior<TRequest, TResponse>> _logger;
-    private readonly int defaultCacheExpirationInHours = 1;
+    private readonly TimeSpan _defaultCacheExpiration = TimeSpan.FromHours(1);
 
-    public CachingBehavior(IEasyCachingProviderFactory cachingFactory,
+    public CachingBehavior(
+        IHybridCacheProvider cacheProvider,
         ILogger<CachingBehavior<TRequest, TResponse>> logger)
     {
+        _cacheProvider = cacheProvider;
         _logger = logger;
-        _cachingProvider = cachingFactory.GetCachingProvider("mem");
     }
 
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next,
@@ -27,24 +27,42 @@ public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
             return await next();
 
         var cacheKey = cacheRequest.CacheKey;
-        var cachedResponse = await _cachingProvider.GetAsync<TResponse>(cacheKey);
-        if (cachedResponse.Value != null)
+        
+        // Try to get from cache first
+        var cachedResponse = await _cacheProvider.GetAsync<TResponse>(cacheKey, cancellationToken);
+        if (cachedResponse != null)
         {
             _logger.LogDebug("Response retrieved {TRequest} from cache. CacheKey: {CacheKey}",
                 typeof(TRequest).FullName, cacheKey);
-            return cachedResponse.Value;
+            return cachedResponse;
         }
 
+        // If not in cache, execute the request
         var response = await next();
 
-        var expirationTime = cacheRequest.AbsoluteExpirationRelativeToNow ??
-                             DateTime.Now.AddHours(defaultCacheExpirationInHours);
+        // Convert DateTime? to TimeSpan for the cache provider
+        TimeSpan expiration = CalculateExpiration(cacheRequest.AbsoluteExpirationRelativeToNow);
 
-        await _cachingProvider.SetAsync(cacheKey, response, expirationTime.TimeOfDay);
+        // Cache the response with locking to prevent race conditions
+        await _cacheProvider.SetWithLockAsync(cacheKey, response, expiration, cancellationToken: cancellationToken);
 
         _logger.LogDebug("Caching response for {TRequest} with cache key: {CacheKey}", typeof(TRequest).FullName,
             cacheKey);
 
         return response;
+    }
+
+    private TimeSpan CalculateExpiration(DateTime? absoluteExpiration)
+    {
+        if (absoluteExpiration.HasValue)
+        {
+            // Calculate the duration from now until the specified DateTime
+            var timeUntilExpiration = absoluteExpiration.Value - DateTime.Now;
+            
+            // Ensure we don't return negative time spans
+            return timeUntilExpiration > TimeSpan.Zero ? timeUntilExpiration : TimeSpan.Zero;
+        }
+        
+        return _defaultCacheExpiration;
     }
 }

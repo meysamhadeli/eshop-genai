@@ -1,10 +1,8 @@
 using Basket.Baskets.Dtos;
-using Basket.Data;
+using Basket.Infrastructure.Redis;
 using BuildingBlocks.Web;
 using Catalog;
-using MapsterMapper;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 
 namespace Basket.Baskets.Features;
 
@@ -12,12 +10,14 @@ public record GetBasketQuery(string UserId) : IRequest<BasketDto>;
 
 public class GetBasketQueryHandler : IRequestHandler<GetBasketQuery, BasketDto>
 {
-    private readonly BasketDbContext _context;
+    private readonly IBasketRedisService _basketRedisService;
     private readonly CatalogGrpcService.CatalogGrpcServiceClient _catalogGrpcServiceClient;
 
-    public GetBasketQueryHandler(BasketDbContext context, IMapper mapper, CatalogGrpcService.CatalogGrpcServiceClient catalogGrpcServiceClient)
+    public GetBasketQueryHandler(
+        IBasketRedisService basketRedisService,
+        CatalogGrpcService.CatalogGrpcServiceClient catalogGrpcServiceClient)
     {
-        _context = context;
+        _basketRedisService = basketRedisService;
         _catalogGrpcServiceClient = catalogGrpcServiceClient;
     }
 
@@ -25,24 +25,35 @@ public class GetBasketQueryHandler : IRequestHandler<GetBasketQuery, BasketDto>
         GetBasketQuery request,
         CancellationToken cancellationToken)
     {
-        var basket = await _context.Baskets
-                         .Include(b => b.Items)
-                         .FirstOrDefaultAsync(b => b.UserId == request.UserId, cancellationToken);
+        // Get basket from Redis
+        var basket = await _basketRedisService.GetBasketAsync(request.UserId, cancellationToken);
 
-        BasketDto basketDto = new BasketDto(basket.Id, basket.UserId, new List<BasketItemsDto>(), (DateTime)basket.CreatedAt, basket.LastModified);
+        // If basket doesn't exist, return an empty basket
+        if (basket == null)
+        {
+            return new BasketDto(
+                request.UserId,
+                new List<BasketItemsDto>(),
+                DateTime.UtcNow,
+                null,
+                null);
+        }
+
+        BasketDto basketDto = new BasketDto(basket.UserId, new List<BasketItemsDto>(), (DateTime)basket.CreatedAt, basket.LastModified, basket.ExpirationTime);
 
         foreach (var item in basket.Items)
         {
-           var product = await _catalogGrpcServiceClient.GetProductByIdAsync(new GetProductByIdRequest(){Id = item.ProductId.ToString()});
-           var basketItem = basket.Items.First(x => x.ProductId == new Guid(product.ProductDto.Id));
-           basketDto.Items.Add(new BasketItemsDto(Guid.CreateVersion7(), basketItem.ProductId, product.ProductDto.Name, (decimal)product.ProductDto.Price, product.ProductDto.ImageUrl, basketItem.Quantity, DateTime.Now));
+            var product = await _catalogGrpcServiceClient.GetProductByIdAsync(new GetProductByIdRequest(){Id = item.ProductId.ToString()});
+            var basketItem = basket.Items.First(x => x.ProductId == new Guid(product.ProductDto.Id));
+            basketDto.Items.Add(new BasketItemsDto( basketItem.ProductId, product.ProductDto.Name, (decimal)product.ProductDto.Price, product.ProductDto.ImageUrl, basketItem.Quantity, DateTime.Now));
         }
-        
+
+
         return basketDto;
     }
 }
 
-public class GetBasketEndpoints: IMinimalEndpoint
+public class GetBasketEndpoints : IMinimalEndpoint
 {
     public IEndpointRouteBuilder MapEndpoint(IEndpointRouteBuilder builder)
     {
