@@ -12,13 +12,18 @@ where TResponse : notnull
 
     public InvalidateCachingBehavior(
         IHybridCacheProvider cacheProvider,
-        ILogger<InvalidateCachingBehavior<TRequest, TResponse>> logger)
+        ILogger<InvalidateCachingBehavior<TRequest, TResponse>> logger
+    )
     {
         _logger = logger;
         _cacheProvider = cacheProvider;
     }
 
-    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
+    public async Task<TResponse> Handle(
+        TRequest request,
+        RequestHandlerDelegate<TResponse> next,
+        CancellationToken cancellationToken
+    )
     {
         if (request is not IInvalidateCacheRequest invalidateCacheRequest)
         {
@@ -27,7 +32,7 @@ where TResponse : notnull
         }
 
         var cacheKey = invalidateCacheRequest.CacheKey;
-        
+
         // Execute the request first
         var response = await next();
 

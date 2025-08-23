@@ -10,6 +10,7 @@ public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
     private readonly IHybridCacheProvider _cacheProvider;
     private readonly ILogger<CachingBehavior<TRequest, TResponse>> _logger;
     private readonly TimeSpan _defaultCacheExpiration = TimeSpan.FromHours(1);
+    private readonly TimeSpan _defaultLockTimeout = TimeSpan.FromSeconds(5);
 
     public CachingBehavior(
         IHybridCacheProvider cacheProvider,
@@ -22,32 +23,55 @@ public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next,
         CancellationToken cancellationToken)
     {
-        if (request is not ICacheRequest cacheRequest)
-            // No cache request found, so just continue through the pipeline
-            return await next();
-
-        var cacheKey = cacheRequest.CacheKey;
-        
-        // Try to get from cache first
-        var cachedResponse = await _cacheProvider.GetAsync<TResponse>(cacheKey, cancellationToken);
-        if (cachedResponse != null)
+        // Check for different cache request types
+        if (request is ICacheRequestWithLock cacheRequestWithLock)
         {
-            _logger.LogDebug("Response retrieved {TRequest} from cache. CacheKey: {CacheKey}",
-                typeof(TRequest).FullName, cacheKey);
-            return cachedResponse;
+            return await HandleWithLock(cacheRequestWithLock, next, cancellationToken);
+        }
+        
+        if (request is ICacheRequest cacheRequest)
+        {
+            return await HandleWithoutLock(cacheRequest, next, cancellationToken);
         }
 
-        // If not in cache, execute the request
-        var response = await next();
+        // No cache request found, continue through pipeline
+        return await next();
+    }
 
-        // Convert DateTime? to TimeSpan for the cache provider
-        TimeSpan expiration = CalculateExpiration(cacheRequest.AbsoluteExpirationRelativeToNow);
+    private async Task<TResponse> HandleWithLock(ICacheRequestWithLock cacheRequest, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
+    {
+        var cacheKey = cacheRequest.CacheKey;
+        var expiration = CalculateExpiration(cacheRequest.AbsoluteExpirationRelativeToNow);
+        var lockTimeout = cacheRequest.LockTimeout ?? _defaultLockTimeout;
 
-        // Cache the response with locking to prevent race conditions
-        await _cacheProvider.SetWithLockAsync(cacheKey, response, expiration, cancellationToken: cancellationToken);
+        // Use distributed locking for cache population
+        var response = await _cacheProvider.GetOrSetWithLockAsync(
+            cacheKey,
+            async () => await next(),
+            expiration,
+            lockTimeout,
+            cancellationToken);
 
-        _logger.LogDebug("Caching response for {TRequest} with cache key: {CacheKey}", typeof(TRequest).FullName,
-            cacheKey);
+        _logger.LogDebug("Response for {TRequest} handled with distributed locking, cache key: {CacheKey}", 
+            typeof(TRequest).FullName, cacheKey);
+
+        return response;
+    }
+
+    private async Task<TResponse> HandleWithoutLock(ICacheRequest cacheRequest, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
+    {
+        var cacheKey = cacheRequest.CacheKey;
+        var expiration = CalculateExpiration(cacheRequest.AbsoluteExpirationRelativeToNow);
+
+        // Use normal caching without distributed locking
+        var response = await _cacheProvider.GetOrSetAsync(
+            cacheKey,
+            async () => await next(),
+            expiration,
+            cancellationToken);
+
+        _logger.LogDebug("Response for {TRequest} handled with cache key: {CacheKey}", 
+            typeof(TRequest).FullName, cacheKey);
 
         return response;
     }
@@ -56,10 +80,7 @@ public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
     {
         if (absoluteExpiration.HasValue)
         {
-            // Calculate the duration from now until the specified DateTime
             var timeUntilExpiration = absoluteExpiration.Value - DateTime.Now;
-            
-            // Ensure we don't return negative time spans
             return timeUntilExpiration > TimeSpan.Zero ? timeUntilExpiration : TimeSpan.Zero;
         }
         

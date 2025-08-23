@@ -1,6 +1,7 @@
 using BuildingBlocks.Web;
 using Medallion.Threading;
 using Medallion.Threading.Redis;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
 
@@ -10,35 +11,40 @@ public static class Extensions
 {
     public static IServiceCollection AddCustomHybridCaching(this IServiceCollection services)
     {
-        var redisOptions = services.GetOptions<RedisOptions>(nameof(RedisOptions));
+        var hybridCacheOptions = services.GetOptions<HybridCacheOptions>(nameof(HybridCacheOptions));
 
-
-        // Add in-memory cache for hybrid caching
-        services.AddMemoryCache(options =>
+        services.AddHybridCache(options =>
                                 {
-                                    options.SizeLimit = 10000; // Limit number of cache entries
+                                    options.DefaultEntryOptions = new HybridCacheEntryOptions
+                                                                  {
+                                                                      Expiration =TimeSpan.FromMinutes(hybridCacheOptions.RedisExpireMinutes ?? 5),
+                                                                      LocalCacheExpiration = TimeSpan.FromMinutes(hybridCacheOptions.InMemoryExpireMinutes ?? 2)
+                                                                  };
                                 });
 
-        // Add Redis Distributed Cache
-        services.AddStackExchangeRedisCache(options =>
-                                            {
-                                                options.Configuration = redisOptions.ConnectionString;
-                                                options.InstanceName = redisOptions.InstanceName;
-                                            });
+        if (!string.IsNullOrEmpty(hybridCacheOptions.RedisConnectionString))
+        {
+            services.AddStackExchangeRedisCache(options =>
+                                                {
+                                                    options.Configuration = hybridCacheOptions.RedisConnectionString;
+                                                    options.InstanceName = hybridCacheOptions.InstanceName;
+                                                });
 
-        // Add Redis Connection Multiplexer
-        services.AddSingleton<IConnectionMultiplexer>(sp => ConnectionMultiplexer.Connect(redisOptions.ConnectionString));
+            services.AddSingleton<IConnectionMultiplexer>(sp => ConnectionMultiplexer.Connect(hybridCacheOptions.RedisConnectionString));
 
-        // Add Medallion Distributed Lock Provider
-        services.AddSingleton<IDistributedLockProvider>(sp =>
-                                                        {
-                                                            var redis = sp.GetRequiredService<IConnectionMultiplexer>();
-                                                            return new RedisDistributedSynchronizationProvider(redis.GetDatabase());
-                                                        });
+            // Add distributed lock provider for Redis
+            if (hybridCacheOptions.UseDistributedLock)
+            {
+                services.AddSingleton<IDistributedLockProvider>(sp =>
+                                                                {
+                                                                    var redis = sp.GetRequiredService<IConnectionMultiplexer>();
+                                                                    return new RedisDistributedSynchronizationProvider(redis.GetDatabase());
+                                                                });
+            }
+        }
 
         services.AddSingleton<IHybridCacheProvider, HybridCacheProvider>();
         
         return services;
     }
-
 }
