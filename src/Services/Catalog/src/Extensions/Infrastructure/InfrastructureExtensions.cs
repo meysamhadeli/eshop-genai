@@ -1,3 +1,4 @@
+using BuildingBlocks.Caching;
 using BuildingBlocks.EFCore;
 using BuildingBlocks.Exception;
 using BuildingBlocks.Jwt;
@@ -60,7 +61,7 @@ public static class InfrastructureExtensions
                                      options.Interceptors.Add<GrpcExceptionInterceptor>();
                                  });
         
-        builder.Services.AddEasyCaching(options => { options.UseInMemory(configuration, "mem"); });
+        builder.Services.AddCustomHybridCaching();
 
         return builder;
     }

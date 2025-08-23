@@ -1,6 +1,6 @@
-using Basket.Data;
+using Basket.Infrastructure.Redis;
 using Booking.Extensions.Infrastructure;
-using BuildingBlocks.EFCore;
+using BuildingBlocks.Caching;
 using BuildingBlocks.Jwt;
 using BuildingBlocks.Mapster;
 using BuildingBlocks.OpenApi;
@@ -8,10 +8,14 @@ using BuildingBlocks.ProblemDetails;
 using BuildingBlocks.Web;
 using Figgle;
 using FluentValidation;
+using Medallion.Threading;
+using Medallion.Threading.Redis;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
+using StackExchange.Redis;
 
 namespace Basket.Extensions.Infrastructure;
-
 
 public static class InfrastructureExtensions
 {
@@ -24,14 +28,14 @@ public static class InfrastructureExtensions
         Console.WriteLine(FiggleFonts.Standard.Render(appOptions.Name));
         
         builder.Services.AddCors(options =>
-                                 {
-                                     options.AddPolicy("AllowFrontend",
-                                         builder => builder
-                                             .WithOrigins(appOptions.UiUrl)
-                                             .AllowAnyMethod()
-                                             .AllowAnyHeader()
-                                             .AllowCredentials());
-                                 });
+        {
+            options.AddPolicy("AllowFrontend",
+                builder => builder
+                    .WithOrigins(appOptions.UiUrl)
+                    .AllowAnyMethod()
+                    .AllowAnyHeader()
+                    .AllowCredentials());
+        });
 
         builder.AddServiceDefaults();
 
@@ -44,7 +48,9 @@ public static class InfrastructureExtensions
         builder.Services.AddProblemDetails();
         builder.Services.AddJwt();
 
-        builder.AddCustomDbContext<BasketDbContext>(nameof(Basket));
+        builder.Services.AddCustomHybridCaching();
+        builder.Services.AddScoped<IBasketRedisService, BasketRedisService>();
+
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddAspnetOpenApi();
         builder.Services.AddCustomVersioning();
@@ -52,13 +58,10 @@ public static class InfrastructureExtensions
         builder.Services.AddCustomMapster(typeof(Program).Assembly);
         builder.Services.AddHttpContextAccessor();
         
-        builder.Services.AddEasyCaching(options => { options.UseInMemory(configuration, "mem"); });
-        
         builder.Services.AddGrpcClients();
 
         return builder;
     }
-
 
     public static WebApplication UseInfrastructure(this WebApplication app)
     {
@@ -74,8 +77,7 @@ public static class InfrastructureExtensions
 
         app.UseCustomProblemDetails();
         app.UseCorrelationId();
-        app.UseMigration<BasketDbContext>();
-
+        
         app.MapGet("/", x => x.Response.WriteAsync(appOptions.Name));
 
         if (env.IsDevelopment())
