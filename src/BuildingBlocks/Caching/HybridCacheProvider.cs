@@ -1,67 +1,113 @@
 using System.Text.Json;
 using Medallion.Threading;
 using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Options;
 
 namespace BuildingBlocks.Caching;
 
 public interface IHybridCacheProvider
 {
+    /// <summary>
+    /// Gets a value from cache or sets it using the factory method if not found.
+    /// Uses .NET HybridCache's built-in stampede protection.
+    /// </summary>
     Task<T?> GetOrSetAsync<T>(string key, Func<Task<T>> factory, TimeSpan? expiration = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets a value from cache or sets it using the factory method with distributed locking.
+    /// Useful for expensive operations that should not be executed concurrently across multiple instances.
+    /// </summary>
     Task<T?> GetOrSetWithLockAsync<T>(string key, Func<Task<T>> factory, TimeSpan? expiration = null, TimeSpan? lockTimeout = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets a value from cache without executing a factory method.
+    /// Returns default(T) if the key does not exist.
+    /// </summary>
     Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sets a value in cache with the specified expiration time.
+    /// </summary>
     Task SetAsync<T>(string key, T value, TimeSpan? expiration = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sets a value in cache with distributed locking to prevent concurrent writes.
+    /// </summary>
     Task SetWithLockAsync<T>(string key, T value, TimeSpan? expiration = null, TimeSpan? lockTimeout = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes a value from cache.
+    /// </summary>
     Task RemoveAsync(string key, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Checks if a key exists in cache.
+    /// </summary>
     Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default);
 }
 
 public class HybridCacheProvider : IHybridCacheProvider
 {
-    private readonly IDistributedCache _distributedCache;
-    private readonly IMemoryCache _memoryCache;
-    private readonly IDistributedLockProvider _lockProvider;
-    private readonly RedisOptions _redisOptions;
-    private readonly JsonSerializerOptions _jsonOptions;
+    private readonly HybridCache _hybridCache;
+    private readonly IDistributedLockProvider? _lockProvider;
+    private readonly HybridCacheOptions _hybridCacheOptions;
     private readonly TimeSpan _defaultLockTimeout = TimeSpan.FromSeconds(5);
+    private readonly bool _redisEnabled;
+    private readonly bool _useDistributedLock;
 
     public HybridCacheProvider(
-        IDistributedCache distributedCache, 
-        IMemoryCache memoryCache,
+        HybridCache hybridCache,
         IDistributedLockProvider lockProvider,
-        IOptions<RedisOptions> redisOptions)
+        IOptions<HybridCacheOptions> hybridCacheOptions)
     {
-        _distributedCache = distributedCache;
-        _memoryCache = memoryCache;
+        _hybridCache = hybridCache;
         _lockProvider = lockProvider;
-        _redisOptions = redisOptions.Value;
+        _hybridCacheOptions = hybridCacheOptions.Value;
         
-        _jsonOptions = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = false
-        };
+        _redisEnabled = !string.IsNullOrEmpty(_hybridCacheOptions.RedisConnectionString);
+        _useDistributedLock = _redisEnabled && _hybridCacheOptions.UseDistributedLock && _lockProvider != null;
     }
 
     public async Task<T?> GetOrSetAsync<T>(string key, Func<Task<T>> factory, TimeSpan? expiration = null, CancellationToken cancellationToken = default)
     {
-        // First try to get from memory cache
-        if (_memoryCache.TryGetValue(key, out T? memoryValue) && memoryValue != null)
+        // Use .NET HybridCache's GetOrCreateAsync
+        return await _hybridCache.GetOrCreateAsync(
+            key,
+            async cancel => await factory(),
+            new HybridCacheEntryOptions { Expiration = expiration ?? GetDefaultExpiration() },
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task<T?> GetOrSetWithLockAsync<T>(string key, Func<Task<T>> factory, TimeSpan? expiration = null, TimeSpan? lockTimeout = null, CancellationToken cancellationToken = default)
+    {
+        if (!_useDistributedLock)
         {
-            return memoryValue;
+            return await GetOrSetAsync(key, factory, expiration, cancellationToken);
         }
 
-        // Then try to get from distributed cache
-        var distributedValue = await GetFromDistributedCacheAsync<T>(key, cancellationToken);
-        if (distributedValue != null)
+        // First try to get the value without creating it
+        var cachedValue = await GetAsync<T>(key, cancellationToken);
+        if (cachedValue != null)
         {
-            // Cache in memory for faster access
-            SetMemoryCache(key, distributedValue, expiration);
-            return distributedValue;
+            return cachedValue;
         }
 
-        // If not found in any cache, execute factory method
+        // Use distributed locking for cache population
+        var lockTime = lockTimeout ?? _defaultLockTimeout;
+        await using var lockHandle = await _lockProvider!.TryAcquireLockAsync(GetLockKey(key), lockTime, cancellationToken);
+        
+        if (lockHandle == null)
+            throw new System.Exception($"Could not acquire lock for cache key: {key}");
+
+        // Double-check after acquiring lock
+        cachedValue = await GetAsync<T>(key, cancellationToken);
+        if (cachedValue != null)
+        {
+            return cachedValue;
+        }
+
+        // Execute factory method and cache the result
         var value = await factory();
         if (value != null)
         {
@@ -71,172 +117,64 @@ public class HybridCacheProvider : IHybridCacheProvider
         return value;
     }
 
-    public async Task<T?> GetOrSetWithLockAsync<T>(string key, Func<Task<T>> factory, TimeSpan? expiration = null, TimeSpan? lockTimeout = null, CancellationToken cancellationToken = default)
-    {
-        // First try to get from memory cache
-        if (_memoryCache.TryGetValue(key, out T? memoryValue) && memoryValue != null)
-        {
-            return memoryValue;
-        }
-
-        // Then try to get from distributed cache
-        var distributedValue = await GetFromDistributedCacheAsync<T>(key, cancellationToken);
-        if (distributedValue != null)
-        {
-            // Cache in memory for faster access
-            SetMemoryCache(key, distributedValue, expiration);
-            return distributedValue;
-        }
-
-        // If not found, acquire lock and execute factory method
-        var lockTime = lockTimeout ?? _defaultLockTimeout;
-        await using var lockHandle = await _lockProvider.TryAcquireLockAsync(GetLockKey(key), lockTime, cancellationToken);
-        
-        if (lockHandle == null)
-            throw new System.Exception($"Could not acquire lock for cache key: {key}");
-
-        // Double-check after acquiring lock
-        distributedValue = await GetFromDistributedCacheAsync<T>(key, cancellationToken);
-        if (distributedValue != null)
-        {
-            SetMemoryCache(key, distributedValue, expiration);
-            return distributedValue;
-        }
-
-        var value = await factory();
-        if (value != null)
-        {
-            await SetDistributedCacheAsync(key, value, expiration, cancellationToken);
-            SetMemoryCache(key, value, expiration);
-        }
-
-        return value;
-    }
-
     public async Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default)
     {
-        // First try memory cache
-        if (_memoryCache.TryGetValue(key, out T? memoryValue) && memoryValue != null)
-        {
-            return memoryValue;
-        }
-
-        // Then try distributed cache
-        var distributedValue = await GetFromDistributedCacheAsync<T>(key, cancellationToken);
-        if (distributedValue != null)
-        {
-            // Cache in memory for faster access
-            SetMemoryCache(key, distributedValue);
-        }
-
-        return distributedValue;
+        // For getting without setting, we use GetOrCreateAsync with a factory that returns default
+        // We need to specify the type explicitly and use ValueTask
+        return await _hybridCache.GetOrCreateAsync<T>(
+            key,
+            static async cancel => default,
+            cancellationToken: cancellationToken);
     }
 
     public async Task SetAsync<T>(string key, T value, TimeSpan? expiration = null, CancellationToken cancellationToken = default)
     {
-        // Set in memory cache
-        SetMemoryCache(key, value, expiration);
-
-        // Set in distributed cache
-        await SetDistributedCacheAsync(key, value, expiration, cancellationToken);
+        await _hybridCache.SetAsync(
+            key,
+            value,
+            new HybridCacheEntryOptions { Expiration = expiration ?? GetDefaultExpiration() }, cancellationToken: cancellationToken);
     }
 
     public async Task SetWithLockAsync<T>(string key, T value, TimeSpan? expiration = null, TimeSpan? lockTimeout = null, CancellationToken cancellationToken = default)
     {
+        if (!_useDistributedLock)
+        {
+            await SetAsync(key, value, expiration, cancellationToken);
+            return;
+        }
+
         var lockTime = lockTimeout ?? _defaultLockTimeout;
-        await using var lockHandle = await _lockProvider.TryAcquireLockAsync(GetLockKey(key), lockTime, cancellationToken);
+        await using var lockHandle = await _lockProvider!.TryAcquireLockAsync(GetLockKey(key), lockTime, cancellationToken);
         
         if (lockHandle == null)
             throw new System.Exception($"Could not acquire lock for cache key: {key}");
 
-        // Set in both caches
-        SetMemoryCache(key, value, expiration);
-        await SetDistributedCacheAsync(key, value, expiration, cancellationToken);
+        await _hybridCache.SetAsync(
+            key,
+            value,
+            new HybridCacheEntryOptions { Expiration = expiration ?? GetDefaultExpiration() }, cancellationToken: cancellationToken);
     }
 
     public async Task RemoveAsync(string key, CancellationToken cancellationToken = default)
     {
-        // Remove from memory cache
-        _memoryCache.Remove(key);
-
-        // Remove from distributed cache
-        await _distributedCache.RemoveAsync(key, cancellationToken);
+        await _hybridCache.RemoveAsync(key, cancellationToken);
     }
 
     public async Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
     {
-        // Check memory cache first
-        if (_memoryCache.TryGetValue(key, out _))
-        {
-            return true;
-        }
-
-        // Check distributed cache
-        var value = await _distributedCache.GetStringAsync(key, cancellationToken);
-        return value != null;
-    }
-
-    private void SetMemoryCache<T>(string key, T value, TimeSpan? expiration = null)
-    {
-        var memoryCacheEntryOptions = new MemoryCacheEntryOptions
-        {
-            Size = 1 // Each entry has size 1 to respect SizeLimit
-        };
-
-        if (expiration.HasValue)
-        {
-            memoryCacheEntryOptions.SetAbsoluteExpiration(expiration.Value);
-        }
-        else
-        {
-            // Default memory cache expiration (shorter than Redis)
-            memoryCacheEntryOptions.SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
-        }
-
-        _memoryCache.Set(key, value, memoryCacheEntryOptions);
-    }
-
-    private async Task SetDistributedCacheAsync<T>(string key, T value, TimeSpan? expiration = null, CancellationToken cancellationToken = default)
-    {
-        var json = JsonSerializer.Serialize(value, _jsonOptions);
-        var options = new DistributedCacheEntryOptions();
-
-        // Use provided expiration, fall back to RedisOptions, then default
-        var finalExpiration = expiration ?? GetDefaultExpiration();
-        options.SetAbsoluteExpiration(finalExpiration);
-
-        await _distributedCache.SetStringAsync(key, json, options, cancellationToken);
-    }
-
-    private async Task<T?> GetFromDistributedCacheAsync<T>(string key, CancellationToken cancellationToken = default)
-    {
-        var json = await _distributedCache.GetStringAsync(key, cancellationToken);
-        if (string.IsNullOrEmpty(json))
-        {
-            return default;
-        }
-
-        try
-        {
-            return JsonSerializer.Deserialize<T>(json, _jsonOptions);
-        }
-        catch (JsonException)
-        {
-            // If deserialization fails, remove the corrupted entry
-            await _distributedCache.RemoveAsync(key, cancellationToken);
-            return default;
-        }
+        // Use GetAsync to check if a value exists (if it returns non-null, the key exists)
+        var result = await GetAsync<object>(key, cancellationToken);
+        return result != null;
     }
 
     private TimeSpan GetDefaultExpiration()
     {
-        // Use RedisOptions.ExpireSeconds if set, otherwise default to 1 hour
-        if (_redisOptions.ExpireSeconds.HasValue && _redisOptions.ExpireSeconds > 0)
+        if (_hybridCacheOptions.RedisExpireMinutes is > 0)
         {
-            return TimeSpan.FromSeconds(_redisOptions.ExpireSeconds.Value);
+            return TimeSpan.FromSeconds(_hybridCacheOptions.RedisExpireMinutes ?? 5);
         }
         
-        return TimeSpan.FromHours(1); // Fallback default
+        return TimeSpan.FromHours(_hybridCacheOptions.InMemoryExpireMinutes ?? 2);
     }
 
     private static string GetLockKey(string cacheKey) => $"lock:{cacheKey}";
