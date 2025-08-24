@@ -7,3 +7,6 @@ export const fetchBasket = (userId = 'user-123') =>
 
 export const updateBasketItem = (productId: string, quantity: number) =>
   api.put('basket/api/v1/basket', { userId: 'user-123', productId, quantity })
+
+export const clearBasket = (userId: string) =>
+  api.delete(`basket/api/v1/basket?UserId=${userId}`)

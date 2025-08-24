@@ -6,9 +6,9 @@ using MediatR;
 
 namespace Basket.Baskets.Features;
 
-public record GetBasketQuery(string UserId) : IRequest<BasketDto>;
+public record GetBasket(string UserId) : IRequest<BasketDto>;
 
-public class GetBasketQueryHandler : IRequestHandler<GetBasketQuery, BasketDto>
+public class GetBasketQueryHandler : IRequestHandler<GetBasket, BasketDto>
 {
     private readonly IBasketRedisService _basketRedisService;
     private readonly CatalogGrpcService.CatalogGrpcServiceClient _catalogGrpcServiceClient;
@@ -22,7 +22,7 @@ public class GetBasketQueryHandler : IRequestHandler<GetBasketQuery, BasketDto>
     }
 
     public async Task<BasketDto> Handle(
-        GetBasketQuery request,
+        GetBasket request,
         CancellationToken cancellationToken)
     {
         // Get basket from Redis
@@ -32,6 +32,7 @@ public class GetBasketQueryHandler : IRequestHandler<GetBasketQuery, BasketDto>
         if (basket == null)
         {
             return new BasketDto(
+                Guid.CreateVersion7(), 
                 request.UserId,
                 new List<BasketItemsDto>(),
                 DateTime.UtcNow,
@@ -39,13 +40,13 @@ public class GetBasketQueryHandler : IRequestHandler<GetBasketQuery, BasketDto>
                 null);
         }
 
-        BasketDto basketDto = new BasketDto(basket.UserId, new List<BasketItemsDto>(), (DateTime)basket.CreatedAt, basket.LastModified, basket.ExpirationTime);
+        BasketDto basketDto = new BasketDto(basket.Id, basket.UserId, new List<BasketItemsDto>(), (DateTime)basket.CreatedAt, basket.LastModified, basket.ExpirationTime);
 
         foreach (var item in basket.Items)
         {
             var product = await _catalogGrpcServiceClient.GetProductByIdAsync(new GetProductByIdRequest(){Id = item.ProductId.ToString()});
             var basketItem = basket.Items.First(x => x.ProductId == new Guid(product.ProductDto.Id));
-            basketDto.Items.Add(new BasketItemsDto( basketItem.ProductId, product.ProductDto.Name, (decimal)product.ProductDto.Price, product.ProductDto.ImageUrl, basketItem.Quantity, DateTime.Now));
+            basketDto.Items.Add(new BasketItemsDto( basketItem.ProductId, product.ProductDto.Name, (decimal)product.ProductDto.Price, product.ProductDto.ImageUrl, basketItem.Quantity));
         }
 
 
@@ -58,7 +59,7 @@ public class GetBasketEndpoints : IMinimalEndpoint
     public IEndpointRouteBuilder MapEndpoint(IEndpointRouteBuilder builder)
     {
         builder.MapGet($"{EndpointConfig.BaseApiPath}/basket", async (
-                                                                   [AsParameters] GetBasketQuery query,
+                                                                   [AsParameters] GetBasket query,
                                                                    IMediator mediator,
                                                                    CancellationToken cancellationToken) =>
                                                                {

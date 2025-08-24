@@ -1,8 +1,8 @@
 import fallbackImg from '@/assets/images/default_product.jpg'
+import { formatCurrency } from '@/shared/lib/currency'
 
 interface Props {
   item: {
-    id: string
     productId: string
     productName: string
     productPrice: number
@@ -13,6 +13,8 @@ interface Props {
 }
 
 export default function BasketItem({ item, onUpdate }: Props) {
+  const lineTotal = item.productPrice * item.quantity
+
   return (
     <div className="flex items-center gap-4 p-4 border rounded-lg shadow-sm bg-white hover:shadow-md transition-shadow">
       {/* Product Image */}
@@ -27,7 +29,7 @@ export default function BasketItem({ item, onUpdate }: Props) {
       {/* Product Info */}
       <div className="flex-1 min-w-0">
         <h3 className="font-semibold text-gray-800 truncate">{item.productName}</h3>
-        <p className="text-amazon-dark font-bold">${item.productPrice?.toFixed(2) || '0.00'}</p>
+        <p className="text-amazon-dark font-bold">{formatCurrency(item.productPrice)}</p>
       </div>
 
       {/* Quantity Controls */}
@@ -51,7 +53,7 @@ export default function BasketItem({ item, onUpdate }: Props) {
 
       {/* Line Total */}
       <div className="text-right font-medium text-gray-800 min-w-20">
-        ${(item.productPrice * item.quantity).toFixed(2)}
+        {formatCurrency(lineTotal)}
       </div>
     </div>
   )

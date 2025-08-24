@@ -6,7 +6,7 @@ public interface IBasketRedisService
 {
     Task<Baskets.Models.Basket?> GetBasketAsync(string userId, CancellationToken cancellationToken = default);
     Task<Baskets.Models.Basket> SaveBasketAsync(Baskets.Models.Basket basket, TimeSpan? expiry = null, CancellationToken cancellationToken = default);
-    Task<bool> DeleteBasketAsync(string userId, CancellationToken cancellationToken = default);
+    Task<bool> ClearBasketAsync(string userId, CancellationToken cancellationToken = default);
 }
 
 public class BasketRedisService : IBasketRedisService
@@ -38,7 +38,7 @@ public class BasketRedisService : IBasketRedisService
         return basket;
     }
 
-    public async Task<bool> DeleteBasketAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<bool> ClearBasketAsync(string userId, CancellationToken cancellationToken = default)
     {
         var key = GetBasketKey(userId);
         await _hybridCacheProvider.RemoveAsync(key, cancellationToken);

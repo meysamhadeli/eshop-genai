@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package basket;
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+service BasketGrpcService {
+  rpc GetBasket (GetBasketRequest) returns (GetBasketResponse);
+  rpc UpdateBasket (UpdateBasketRequest) returns (UpdateBasketResponse);
+  rpc ClearBasket (ClearBasketRequest) returns (ClearBasketResponse);
+}
+
+message GetBasketRequest {
+  string user_id = 1;
+}
+
+message GetBasketResponse {
+  string user_id = 1;
+  repeated BasketItem items = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp last_modified = 4;
+  google.protobuf.Timestamp expiration_time = 5;
+}
+
+message BasketItem {
+  string product_id = 1;
+  int32 quantity = 2;
+}
+
+message UpdateBasketRequest {
+  string user_id = 1;
+  BasketItem item = 2;
+}
+
+message UpdateBasketResponse {
+  Basket basket = 1;
+}
+
+message ClearBasketRequest {
+  string user_id = 1;
+}
+
+message ClearBasketResponse {
+  bool success = 1;
+}
+
+message Basket {
+  string id = 1;
+  string user_id = 2;
+  repeated BasketItem items = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp last_modified = 5;
+  google.protobuf.Timestamp expiration_time = 6;
+}

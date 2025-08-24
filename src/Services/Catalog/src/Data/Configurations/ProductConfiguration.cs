@@ -27,5 +27,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             
         builder.Property(p => p.ImageUrl)
             .HasMaxLength(2048);
+        
+        builder.Property(r => r.Version).IsConcurrencyToken();
     }
 }

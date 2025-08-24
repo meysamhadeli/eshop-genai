@@ -20,7 +20,6 @@ public static class InitialData
                 Price = 999.99m,
                 ImageUrl = "Images/iphone-16.jpg",
                 CreatedAt = DateTime.UtcNow,
-                Version = 1
             },
             new Product()
             {
@@ -30,7 +29,6 @@ public static class InitialData
                 Price = 1299.99m,
                 ImageUrl = "Images/laptop-asus.jpg",
                 CreatedAt = DateTime.UtcNow,
-                Version = 1
             },
             new Product()
             {
@@ -40,7 +38,6 @@ public static class InitialData
                 Price = 699.99m,
                 ImageUrl = "Images/laptop-hp14.jpg",
                 CreatedAt = DateTime.UtcNow,
-                Version = 1
             },
             new Product()
             {
@@ -50,7 +47,6 @@ public static class InitialData
                 Price = 899.99m,
                 ImageUrl = "Images/laptop-lenovo.jpg",
                 CreatedAt = DateTime.UtcNow,
-                Version = 1
             },
             new Product()
             {
@@ -60,7 +56,6 @@ public static class InitialData
                 Price = 1199.99m,
                 ImageUrl = "Images/laptop-microsoft.jpg",
                 CreatedAt = DateTime.UtcNow,
-                Version = 1
             },
             new Product()
             {
@@ -70,7 +65,6 @@ public static class InitialData
                 Price = 249.99m,
                 ImageUrl = "Images/redmi-note14.jpg",
                 CreatedAt = DateTime.UtcNow,
-                Version = 1
             },
             new Product()
             {
@@ -80,7 +74,6 @@ public static class InitialData
                 Price = 799.99m,
                 ImageUrl = "Images/samsung-s20.jpg",
                 CreatedAt = DateTime.UtcNow,
-                Version = 1
             },
             new Product()
             {
@@ -89,9 +82,7 @@ public static class InitialData
                 Description = "Flagship smartphone with Dynamic AMOLED display",
                 Price = 900.99m,
                 ImageUrl = "Images/samsung-s20-plus.jpg",
-                CreatedAt = DateTime.UtcNow,
-                LastModified = null,
-                Version = 1
+                CreatedAt = DateTime.UtcNow
             },
         };
     }
