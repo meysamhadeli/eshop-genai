@@ -5,6 +5,8 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Grpc.AspNetCore" Version="2.67.0" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.67.0" />
     <PackageReference Include="Grpc.Tools" Version="2.68.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -13,7 +15,7 @@
 
   <ItemGroup>
     <Protobuf Include="GrpcClient\Protos\catalog.proto" GrpcServices="Both" />
-    <Folder Include="GrpcClient\Protos" />
+    <Protobuf Include="GrpcServer\Protos\basket.proto" GrpcServices="Both" />
   </ItemGroup>
   
   <ItemGroup>

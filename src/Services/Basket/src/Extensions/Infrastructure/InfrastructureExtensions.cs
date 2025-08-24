@@ -1,6 +1,8 @@
+using Basket.GrpcServer.Services;
 using Basket.Infrastructure.Redis;
 using Booking.Extensions.Infrastructure;
 using BuildingBlocks.Caching;
+using BuildingBlocks.Exception;
 using BuildingBlocks.Jwt;
 using BuildingBlocks.Mapster;
 using BuildingBlocks.OpenApi;
@@ -8,12 +10,7 @@ using BuildingBlocks.ProblemDetails;
 using BuildingBlocks.Web;
 using Figgle;
 using FluentValidation;
-using Medallion.Threading;
-using Medallion.Threading.Redis;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Caching.Memory;
-using StackExchange.Redis;
 
 namespace Basket.Extensions.Infrastructure;
 
@@ -58,6 +55,10 @@ public static class InfrastructureExtensions
         builder.Services.AddCustomMapster(typeof(Program).Assembly);
         builder.Services.AddHttpContextAccessor();
         
+        builder.Services.AddGrpc(options => 
+         {
+             options.Interceptors.Add<GrpcExceptionInterceptor>();
+         });
         builder.Services.AddGrpcClients();
 
         return builder;
@@ -77,6 +78,7 @@ public static class InfrastructureExtensions
 
         app.UseCustomProblemDetails();
         app.UseCorrelationId();
+        app.MapGrpcService<BasketGrpcServices>();
         
         app.MapGet("/", x => x.Response.WriteAsync(appOptions.Name));
 

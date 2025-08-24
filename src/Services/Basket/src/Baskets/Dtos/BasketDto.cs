@@ -1,6 +1,7 @@
 namespace Basket.Baskets.Dtos;
 
 public record BasketDto(
+    Guid Id,
     string UserId,
     List<BasketItemsDto> Items,
     DateTime CreatedAt,
@@ -12,5 +13,4 @@ public record BasketItemsDto(
     string ProductName,
     decimal ProductPrice,
     string ProductImageUrl,
-    int Quantity,
-    DateTime CreatedAt);
+    int Quantity);

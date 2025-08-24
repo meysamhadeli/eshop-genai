@@ -38,6 +38,7 @@ export default function ProductDetailPage() {
       items: [],
       createdAt: new Date().toISOString(),
       lastModified: null,
+      ExpirationTime: null
     },
   })
 

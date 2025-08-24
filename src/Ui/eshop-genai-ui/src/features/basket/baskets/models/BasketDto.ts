@@ -1,12 +1,10 @@
 
 export type BasketItemDto = {
-  id: string
   productId: string
   productName: string
   productPrice: number
   productImageUrl: string
   quantity: number
-  createdAt: string
 }
 
 export type BasketDto = {
@@ -15,4 +13,5 @@ export type BasketDto = {
   items: BasketItemDto[]
   createdAt: string
   lastModified: string | null
+  ExpirationTime: string | null
 }
