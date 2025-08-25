@@ -1,3 +1,4 @@
+using BuildingBlocks.AI.SemanticSearch;
 using BuildingBlocks.Caching;
 using BuildingBlocks.EFCore;
 using BuildingBlocks.Exception;
@@ -62,6 +63,7 @@ public static class InfrastructureExtensions
                                  });
         
         builder.Services.AddCustomHybridCaching();
+        builder.Services.AddSemanticSearch();
 
         return builder;
     }
