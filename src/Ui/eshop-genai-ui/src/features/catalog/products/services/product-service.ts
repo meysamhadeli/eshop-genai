@@ -2,9 +2,9 @@
 import type { ProductDto } from '@/features/catalog/products/models/ProductDto';
 import { api } from '@/shared/lib/api-client'
 
-export const fetchProducts = (search = '', page = 1, size = 10) =>
+export const fetchProducts = (search = '', page = 1, size = 10, useSemanticSearch = true) =>
   api.get<{ items: ProductDto[]; totalCount: number; pageNumber: number; pageSize: number }>(
-    `catalog/api/v1/product?SearchTerm=${search}&PageNumber=${page}&PageSize=${size}`
+    `catalog/api/v1/product?SearchTerm=${search}&PageNumber=${page}&PageSize=${size}&UseSemanticSearch=${useSemanticSearch}`
   )
 
 export const fetchProductById = (id: string) =>

@@ -97,6 +97,32 @@ services:
 
 
   # #######################################################
+  # #  Ollama
+  # #######################################################
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - infrastructure
+
+  # #######################################################
+  # #  Qdrant
+  # #######################################################
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"   
+      - "6334:6334"  
+    volumes:
+      - qdrant_data:/qdrant/storage  
+    networks:
+      - infrastructure
+
+  # #######################################################
   # #  jaeger
   # # https://www.jaegertracing.io/docs/1.64/deployment/
   # # https://www.jaegertracing.io/docs/1.6/deployment/
@@ -360,3 +386,5 @@ networks:
 volumes:
   elastic-data:
   postgres-data:
+  ollama_data:
+  qdrant_data:
