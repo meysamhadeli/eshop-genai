@@ -40,7 +40,7 @@ public class GetProductByIdHandler : IRequestHandler<GetProductById, ProductDto>
 }
 
 
-public class GetProductByIdEndpoints: IMinimalEndpoint
+public class GetProductByIdEndpoints : IMinimalEndpoint
 {
     public IEndpointRouteBuilder MapEndpoint(IEndpointRouteBuilder builder)
     {
@@ -48,7 +48,7 @@ public class GetProductByIdEndpoints: IMinimalEndpoint
                                                                               IMediator mediator,
                                                                               CancellationToken cancellationToken) =>
                                                                 {
-                                                                    var result = await mediator.Send(new GetProductById(id),cancellationToken);
+                                                                    var result = await mediator.Send(new GetProductById(id), cancellationToken);
                                                                     return Results.Ok(result);
                                                                 })
             .WithName("GetProductById")

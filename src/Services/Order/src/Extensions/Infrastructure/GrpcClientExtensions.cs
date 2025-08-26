@@ -43,7 +43,7 @@ public static class GrpcClientExtensions
                         Timeout = timeSpan * 3,
                     });
             });
-        
+
         services.AddGrpcClient<BasketGrpcService.BasketGrpcServiceClient>(o =>
                                                                             {
                                                                                 o.Address = new Uri(
@@ -73,7 +73,7 @@ public static class GrpcClientExtensions
                         Timeout = timeSpan * 3,
                     });
             });
-        
+
         return services;
     }
 }

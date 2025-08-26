@@ -64,7 +64,7 @@ public class HybridCacheProvider : IHybridCacheProvider
         _hybridCache = hybridCache;
         _lockProvider = lockProvider;
         _hybridCacheOptions = hybridCacheOptions.Value;
-        
+
         _redisEnabled = !string.IsNullOrEmpty(_hybridCacheOptions.RedisConnectionString);
         _useDistributedLock = _redisEnabled && _hybridCacheOptions.UseDistributedLock && _lockProvider != null;
     }
@@ -96,7 +96,7 @@ public class HybridCacheProvider : IHybridCacheProvider
         // Use distributed locking for cache population
         var lockTime = lockTimeout ?? _defaultLockTimeout;
         await using var lockHandle = await _lockProvider!.TryAcquireLockAsync(GetLockKey(key), lockTime, cancellationToken);
-        
+
         if (lockHandle == null)
             throw new System.Exception($"Could not acquire lock for cache key: {key}");
 
@@ -145,7 +145,7 @@ public class HybridCacheProvider : IHybridCacheProvider
 
         var lockTime = lockTimeout ?? _defaultLockTimeout;
         await using var lockHandle = await _lockProvider!.TryAcquireLockAsync(GetLockKey(key), lockTime, cancellationToken);
-        
+
         if (lockHandle == null)
             throw new System.Exception($"Could not acquire lock for cache key: {key}");
 
@@ -173,7 +173,7 @@ public class HybridCacheProvider : IHybridCacheProvider
         {
             return TimeSpan.FromSeconds(_hybridCacheOptions.RedisExpireMinutes ?? 5);
         }
-        
+
         return TimeSpan.FromHours(_hybridCacheOptions.InMemoryExpireMinutes ?? 2);
     }
 

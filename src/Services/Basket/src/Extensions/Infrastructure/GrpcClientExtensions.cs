@@ -42,7 +42,7 @@ public static class GrpcClientExtensions
                             Timeout = timeSpan * 3,
                         });
                 });
-        
+
         return services;
     }
 }

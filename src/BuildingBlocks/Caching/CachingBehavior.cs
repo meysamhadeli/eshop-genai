@@ -28,7 +28,7 @@ public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
         {
             return await HandleWithLock(cacheRequestWithLock, next, cancellationToken);
         }
-        
+
         if (request is ICacheRequest cacheRequest)
         {
             return await HandleWithoutLock(cacheRequest, next, cancellationToken);
@@ -52,7 +52,7 @@ public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
             lockTimeout,
             cancellationToken);
 
-        _logger.LogDebug("Response for {TRequest} handled with distributed locking, cache key: {CacheKey}", 
+        _logger.LogDebug("Response for {TRequest} handled with distributed locking, cache key: {CacheKey}",
             typeof(TRequest).FullName, cacheKey);
 
         return response;
@@ -70,7 +70,7 @@ public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
             expiration,
             cancellationToken);
 
-        _logger.LogDebug("Response for {TRequest} handled with cache key: {CacheKey}", 
+        _logger.LogDebug("Response for {TRequest} handled with cache key: {CacheKey}",
             typeof(TRequest).FullName, cacheKey);
 
         return response;
@@ -83,7 +83,7 @@ public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
             var timeUntilExpiration = absoluteExpiration.Value - DateTime.Now;
             return timeUntilExpiration > TimeSpan.Zero ? timeUntilExpiration : TimeSpan.Zero;
         }
-        
+
         return _defaultCacheExpiration;
     }
 }

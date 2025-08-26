@@ -21,4 +21,3 @@ public record OrderItemDto(
     int Quantity,
     decimal TotalPrice,
     string ImageUrl);
-    

@@ -53,15 +53,15 @@ public class UpdateItemCommandHandler : IRequestHandler<UpdateItem, BasketDto>
 
         if (productResponse?.ProductDto == null)
             throw new ProductNotFoundException();
-        
+
 
         // Get or create basket
-        var basket = await _basketRedisService.GetBasketAsync(request.UserId, cancellationToken) 
-                     ?? new Models.Basket 
-                     { 
-                         Id = Guid.NewGuid(), 
-                         UserId = request.UserId, 
-                         CreatedAt = DateTime.UtcNow 
+        var basket = await _basketRedisService.GetBasketAsync(request.UserId, cancellationToken)
+                     ?? new Models.Basket
+                     {
+                         Id = Guid.NewGuid(),
+                         UserId = request.UserId,
+                         CreatedAt = DateTime.UtcNow
                      };
 
         // Update basket items
@@ -101,7 +101,7 @@ public class UpdateItemCommandHandler : IRequestHandler<UpdateItem, BasketDto>
     }
 }
 
-public class AddBasketEndpoints: IMinimalEndpoint
+public class AddBasketEndpoints : IMinimalEndpoint
 {
     public IEndpointRouteBuilder MapEndpoint(IEndpointRouteBuilder builder)
     {
@@ -121,7 +121,7 @@ public class AddBasketEndpoints: IMinimalEndpoint
             .WithDescription("Update Basket Items")
             .WithOpenApi()
             .HasApiVersion(1.0);
-        
+
         return builder;
     }
 }

@@ -22,10 +22,10 @@ public static class InfrastructureExtensions
     {
         var configuration = builder.Configuration;
         var env = builder.Environment;
-        
+
         var appOptions = builder.Services.GetOptions<AppOptions>(nameof(AppOptions));
         Console.WriteLine(FiggleFonts.Standard.Render(appOptions.Name));
-        
+
         builder.Services.AddCors(options =>
                                  {
                                      options.AddPolicy("AllowFrontend",
@@ -59,7 +59,7 @@ public static class InfrastructureExtensions
         builder.Services.AddCustomMapster(typeof(Program).Assembly);
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddCustomMassTransit(env, TransportType.RabbitMq, typeof(Program).Assembly);
-        
+
         builder.Services.AddCustomHybridCaching();
         builder.Services.AddGrpcClients();
 
@@ -71,7 +71,7 @@ public static class InfrastructureExtensions
     {
         var env = app.Environment;
         var appOptions = app.GetOptions<AppOptions>(nameof(AppOptions));
-        
+
         app.UseCors("AllowFrontend");
         app.UseStaticFiles();
 

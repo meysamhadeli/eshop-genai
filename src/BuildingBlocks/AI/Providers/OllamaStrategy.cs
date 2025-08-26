@@ -4,7 +4,7 @@ using Microsoft.SemanticKernel.Embeddings;
 
 namespace BuildingBlocks.AI.SemanticSearch.Providers;
 
-public class OllamaStrategy: IAIProviders
+public class OllamaStrategy : IAIProviders
 {
     private readonly SemanticSearchOptions _options;
 
@@ -23,7 +23,7 @@ public class OllamaStrategy: IAIProviders
 
         return kernel.GetRequiredService<ITextEmbeddingGenerationService>();
     }
-    
+
     public IChatCompletionService CreateChatProvider()
     {
         var kernel = Kernel.CreateBuilder()

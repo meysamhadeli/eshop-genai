@@ -19,17 +19,17 @@ public class CatalogGrpcServices : CatalogGrpcService.CatalogGrpcServiceBase
         var productDto = await _mediator.Send(new GetProductById(new Guid(request.Id)));
 
         return new GetProductByIdResult
-               {
-                   ProductDto = new ProductResponse
-                                {
-                                    Id = productDto.Id.ToString(),
-                                    Name = productDto.Name,
-                                    Description = productDto.Description,
-                                    Price = (double)productDto.Price,
-                                    ImageUrl = productDto.ImageUrl,
-                                    CreatedAt = Timestamp.FromDateTime(productDto.CreatedAt.ToUniversalTime()),
-                                    LastModified = productDto.LastModified != null ? Timestamp.FromDateTime((DateTime)productDto.LastModified?.ToUniversalTime()!) : null
-                                }
-               };
+        {
+            ProductDto = new ProductResponse
+            {
+                Id = productDto.Id.ToString(),
+                Name = productDto.Name,
+                Description = productDto.Description,
+                Price = (double)productDto.Price,
+                ImageUrl = productDto.ImageUrl,
+                CreatedAt = Timestamp.FromDateTime(productDto.CreatedAt.ToUniversalTime()),
+                LastModified = productDto.LastModified != null ? Timestamp.FromDateTime((DateTime)productDto.LastModified?.ToUniversalTime()!) : null
+            }
+        };
     }
 }
