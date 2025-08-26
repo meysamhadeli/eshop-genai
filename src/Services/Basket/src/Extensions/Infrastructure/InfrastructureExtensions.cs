@@ -2,10 +2,13 @@ using Basket.GrpcServer.Services;
 using Basket.Infrastructure.Redis;
 using Booking.Extensions.Infrastructure;
 using BuildingBlocks.Caching;
+using BuildingBlocks.Core;
 using BuildingBlocks.Exception;
 using BuildingBlocks.Jwt;
 using BuildingBlocks.Mapster;
+using BuildingBlocks.MassTransit;
 using BuildingBlocks.OpenApi;
+using BuildingBlocks.PersistMessageProcessor;
 using BuildingBlocks.ProblemDetails;
 using BuildingBlocks.Web;
 using Figgle;
@@ -45,6 +48,10 @@ public static class InfrastructureExtensions
         builder.Services.AddProblemDetails();
         builder.Services.AddJwt();
 
+        builder.AddPersistMessageProcessor(nameof(PersistMessage));
+        builder.Services.AddScoped<IEventDispatcher, EventDispatcher>();
+        builder.Services.AddScoped<ICurrentUserProvider, CurrentUserProvider>();
+
         builder.Services.AddCustomHybridCaching();
         builder.Services.AddScoped<IBasketRedisService, BasketRedisService>();
 
@@ -54,6 +61,7 @@ public static class InfrastructureExtensions
         builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
         builder.Services.AddCustomMapster(typeof(Program).Assembly);
         builder.Services.AddHttpContextAccessor();
+        builder.Services.AddCustomMassTransit(env, TransportType.RabbitMq, typeof(Program).Assembly);
         
         builder.Services.AddGrpc(options => 
          {

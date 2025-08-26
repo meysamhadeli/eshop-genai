@@ -42,7 +42,6 @@ namespace Order.Data.Migrations
                     product_name = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     unit_price = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
                     quantity = table.Column<int>(type: "integer", nullable: false),
-                    total_price = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
                     image_url = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true)
                 },
                 constraints: table =>

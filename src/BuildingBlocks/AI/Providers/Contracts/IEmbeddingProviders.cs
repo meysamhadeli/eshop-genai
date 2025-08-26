@@ -2,7 +2,7 @@ using Microsoft.SemanticKernel.Embeddings;
 
 namespace BuildingBlocks.AI.SemanticSearch.Providers;
 
-public interface IEmbeddingProvider
+public interface IEmbeddingProviders
 {
     ITextEmbeddingGenerationService CreateEmbeddingProvider();
 }

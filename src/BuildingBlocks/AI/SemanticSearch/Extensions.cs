@@ -14,7 +14,7 @@ public static class Extensions
         var options = services.GetOptions<SemanticSearchOptions>(nameof(SemanticSearchOptions));
 
         services.AddSingleton(new QdrantClient(new Uri(options.VectorDbConnectionString)));
-        services.AddSingleton(_=> EmbeddingProviderFactory.Register(options));
+        services.AddSingleton(_=> AIProviderFactory.RegisterEmbeddingProviders(options));
         services.AddSingleton<ISemanticSearchService, SemanticSearchService>();
 
         return services;

@@ -12,7 +12,7 @@ using Order.Data;
 namespace Order.Data.Migrations
 {
     [DbContext(typeof(OrderDbContext))]
-    [Migration("20250824192221_initial")]
+    [Migration("20250826173137_initial")]
     partial class initial
     {
         /// <inheritdoc />
@@ -122,10 +122,6 @@ namespace Order.Data.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer")
                         .HasColumnName("quantity");
-
-                    b.Property<decimal>("TotalPrice")
-                        .HasColumnType("decimal(18,2)")
-                        .HasColumnName("total_price");
 
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("decimal(18,2)")

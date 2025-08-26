@@ -34,9 +34,6 @@ public class OrderItemConfiguration : IEntityTypeConfiguration<OrderItem>
             .IsRequired(false) 
             .HasMaxLength(500);
         
-        builder.Property(oi => oi.TotalPrice)
-            .HasColumnType("decimal(18,2)");
-        
         builder.HasIndex(oi => oi.OrderId);
         builder.HasIndex(oi => oi.ProductId);
         

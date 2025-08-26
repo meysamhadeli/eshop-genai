@@ -1,4 +1,6 @@
 using Basket.Infrastructure.Redis;
+using BuildingBlocks.Core;
+using BuildingBlocks.Core.Event;
 using BuildingBlocks.Web;
 using MediatR;
 
@@ -6,24 +8,33 @@ namespace Basket.Baskets.Features;
 
 public record ClearBasket(string UserId) : IRequest<bool>;
 
+public record ClearBasketItemIntegrationEvent(string UserId, bool IsCleared) : IIntegrationEvent;
+
 public class ClearBasketHandler : IRequestHandler<ClearBasket, bool>
 {
     private readonly IBasketRedisService _basketRedisService;
     private readonly ILogger<ClearBasketHandler> _logger;
+    private readonly IEventDispatcher _eventDispatcher;
 
     public ClearBasketHandler(
         IBasketRedisService basketRedisService,
-        ILogger<ClearBasketHandler> logger)
+        ILogger<ClearBasketHandler> logger,
+        IEventDispatcher eventDispatcher)
     {
         _basketRedisService = basketRedisService;
         _logger = logger;
+        _eventDispatcher = eventDispatcher;
     }
 
     public async Task<bool> Handle(ClearBasket request, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Clearing basket for user: {UserId}", request.UserId);
         
-        return await _basketRedisService.ClearBasketAsync(request.UserId, cancellationToken);
+        var isCleared = await _basketRedisService.ClearBasketAsync(request.UserId, cancellationToken);
+
+        await _eventDispatcher.SendAsync(new ClearBasketItemIntegrationEvent(request.UserId, isCleared), cancellationToken: cancellationToken);
+            
+        return isCleared;
     }
 }
 

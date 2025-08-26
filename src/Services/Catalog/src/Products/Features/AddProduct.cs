@@ -1,3 +1,5 @@
+using BuildingBlocks.Core;
+using BuildingBlocks.Core.Event;
 using BuildingBlocks.Web;
 using Catalog.Data;
 using Catalog.Products.Dtos;
@@ -13,15 +15,19 @@ public record AddProduct(
     decimal Price,
     string ImageUrl) : IRequest<ProductDto>;
 
+public record ProductAddedIntegrationEvent(Guid Id, string Name, decimal Price, string ImageUrl, bool IsDeleted) : IIntegrationEvent;
+
 public class AddProductCommandHandler : IRequestHandler<AddProduct, ProductDto>
 {
     private readonly CatalogDbContext _context;
     private readonly IMapper _mapper;
+    private readonly IIntegrationEventCollector _integrationEventCollector;
 
-    public AddProductCommandHandler(CatalogDbContext context, IMapper mapper)
+    public AddProductCommandHandler(CatalogDbContext context, IMapper mapper, IIntegrationEventCollector integrationEventCollector)
     {
         _context = context;
         _mapper = mapper;
+        _integrationEventCollector = integrationEventCollector;
     }
 
     public async Task<ProductDto> Handle(
@@ -37,8 +43,9 @@ public class AddProductCommandHandler : IRequestHandler<AddProduct, ProductDto>
                       };
 
         _context.Products.Add(product);
-        await _context.SaveChangesAsync(cancellationToken);
-
+        
+        _integrationEventCollector.AddEvent(new ProductAddedIntegrationEvent(product.Id, product.Name, product.Price, product.ImageUrl, false));
+        
         return _mapper.Map<ProductDto>(product);
     }
 }

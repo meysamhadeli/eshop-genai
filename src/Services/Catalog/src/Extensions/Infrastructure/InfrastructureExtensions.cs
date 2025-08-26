@@ -1,10 +1,13 @@
 using BuildingBlocks.AI.SemanticSearch;
 using BuildingBlocks.Caching;
+using BuildingBlocks.Core;
 using BuildingBlocks.EFCore;
 using BuildingBlocks.Exception;
 using BuildingBlocks.Jwt;
 using BuildingBlocks.Mapster;
+using BuildingBlocks.MassTransit;
 using BuildingBlocks.OpenApi;
+using BuildingBlocks.PersistMessageProcessor;
 using BuildingBlocks.ProblemDetails;
 using BuildingBlocks.Web;
 using Catalog.Data;
@@ -49,13 +52,18 @@ public static class InfrastructureExtensions
         builder.Services.AddJwt();
 
         builder.AddCustomDbContext<CatalogDbContext>(nameof(Catalog));
+        builder.AddPersistMessageProcessor(nameof(PersistMessage));
+        builder.Services.AddScoped<IEventDispatcher, EventDispatcher>();
+        builder.Services.AddScoped<IIntegrationEventCollector, IntegrationEventCollector>();
         builder.Services.AddScoped<IDataSeeder, CatalogDataSeeder>();
+        builder.Services.AddScoped<ICurrentUserProvider, CurrentUserProvider>();
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddAspnetOpenApi();
         builder.Services.AddCustomVersioning();
         builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
         builder.Services.AddCustomMapster(typeof(Program).Assembly);
         builder.Services.AddHttpContextAccessor();
+        builder.Services.AddCustomMassTransit(env, TransportType.RabbitMq, typeof(Program).Assembly);
 
         builder.Services.AddGrpc(options =>
                                  {

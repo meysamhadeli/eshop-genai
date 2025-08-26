@@ -9,10 +9,11 @@ using Microsoft.Extensions.Logging;
 namespace BuildingBlocks.EFCore;
 
 
-public class EfTxBehavior<TRequest, TResponse>(
-    ILogger<EfTxBehavior<TRequest, TResponse>> logger,
+public class EfTxIntegrationEventBehavior<TRequest, TResponse>(
+    ILogger<EfTxIntegrationEventBehavior<TRequest, TResponse>> logger,
     IDbContext dbContextBase,
     IPersistMessageDbContext persistMessageDbContext,
+    IIntegrationEventCollector integrationEventCollector,
     IEventDispatcher eventDispatcher
 )
     : IPipelineBehavior<TRequest, TResponse>
@@ -24,18 +25,18 @@ where TResponse : notnull
     {
         logger.LogInformation(
             "{Prefix} Handled command {MediatrRequest}",
-            nameof(EfTxBehavior<TRequest, TResponse>),
+            nameof(EfTxDomainEventBehavior<TRequest, TResponse>),
             typeof(TRequest).FullName);
 
         logger.LogDebug(
             "{Prefix} Handled command {MediatrRequest} with content {RequestContent}",
-            nameof(EfTxBehavior<TRequest, TResponse>),
+            nameof(EfTxDomainEventBehavior<TRequest, TResponse>),
             typeof(TRequest).FullName,
             JsonSerializer.Serialize(request));
 
         logger.LogInformation(
             "{Prefix} Open the transaction for {MediatrRequest}",
-            nameof(EfTxBehavior<TRequest, TResponse>),
+            nameof(EfTxDomainEventBehavior<TRequest, TResponse>),
             typeof(TRequest).FullName);
 
         //ref: https://learn.microsoft.com/en-us/ef/core/saving/transactions#using-systemtransactions
@@ -47,19 +48,19 @@ where TResponse : notnull
 
         logger.LogInformation(
             "{Prefix} Executed the {MediatrRequest} request",
-            nameof(EfTxBehavior<TRequest, TResponse>),
+            nameof(EfTxDomainEventBehavior<TRequest, TResponse>),
             typeof(TRequest).FullName);
 
         while (true)
         {
-            var domainEvents = dbContextBase.GetDomainEvents();
-
-            if (domainEvents is null || !domainEvents.Any())
+            var integrationEvents = integrationEventCollector.GetEvents().ToList();
+            
+            if (integrationEvents is null || !integrationEvents.Any())
             {
                 return response;
             }
 
-            await eventDispatcher.SendAsync(domainEvents.ToArray(), typeof(TRequest), cancellationToken);
+            await eventDispatcher.SendAsync(integrationEvents.ToArray(), typeof(TRequest), cancellationToken);
 
             // Save data to database with some retry policy in distributed transaction
             await dbContextBase.RetryOnFailure(async () =>

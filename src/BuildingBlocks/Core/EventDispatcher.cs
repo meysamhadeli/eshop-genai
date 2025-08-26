@@ -11,13 +11,16 @@ namespace BuildingBlocks.Core;
 
 public sealed class EventDispatcher(
     IServiceScopeFactory serviceScopeFactory,
-    IEventMapper eventMapper,
+    IServiceProvider serviceProvider,
     ILogger<EventDispatcher> logger,
     IPersistMessageProcessor persistMessageProcessor,
     IHttpContextAccessor httpContextAccessor
-)
-    : IEventDispatcher
+) : IEventDispatcher
 {
+    private readonly Lazy<IEventMapper> _eventMapper = new Lazy<IEventMapper>(
+        () => serviceProvider.GetRequiredService<IEventMapper>()
+    );
+
     public async Task SendAsync<T>(IReadOnlyList<T> events, Type type = null,
                                    CancellationToken cancellationToken = default)
         where T : IEvent
@@ -72,7 +75,6 @@ public sealed class EventDispatcher(
         where T : IEvent =>
         await SendAsync(new[] { @event }, type, cancellationToken);
 
-
     private Task<IReadOnlyList<IIntegrationEvent>> MapDomainEventToIntegrationEventAsync(
         IReadOnlyList<IDomainEvent> events)
     {
@@ -89,7 +91,7 @@ public sealed class EventDispatcher(
             var eventType = @event.GetType();
             logger.LogTrace($"Handling domain event: {eventType.Name}");
 
-            var integrationEvent = eventMapper.MapToIntegrationEvent(@event);
+            var integrationEvent = _eventMapper.Value.MapToIntegrationEvent(@event);
 
             if (integrationEvent is null)
                 continue;
@@ -101,7 +103,6 @@ public sealed class EventDispatcher(
 
         return Task.FromResult<IReadOnlyList<IIntegrationEvent>>(integrationEvents);
     }
-
 
     private Task<IReadOnlyList<IInternalCommand>> MapDomainEventToInternalCommandAsync(
         IReadOnlyList<IDomainEvent> events)
@@ -115,12 +116,12 @@ public sealed class EventDispatcher(
             var eventType = @event.GetType();
             logger.LogTrace($"Handling domain event: {eventType.Name}");
 
-            var integrationEvent = eventMapper.MapToInternalCommand(@event);
+            var internalCommand = _eventMapper.Value.MapToInternalCommand(@event);
 
-            if (integrationEvent is null)
+            if (internalCommand is null)
                 continue;
 
-            internalCommands.Add(integrationEvent);
+            internalCommands.Add(internalCommand);
         }
 
         logger.LogTrace("Processing internal message done...");

@@ -1,8 +1,11 @@
 using BuildingBlocks.Caching;
+using BuildingBlocks.Core;
 using BuildingBlocks.EFCore;
 using BuildingBlocks.Jwt;
 using BuildingBlocks.Mapster;
+using BuildingBlocks.MassTransit;
 using BuildingBlocks.OpenApi;
+using BuildingBlocks.PersistMessageProcessor;
 using BuildingBlocks.ProblemDetails;
 using BuildingBlocks.Web;
 using Figgle;
@@ -45,12 +48,17 @@ public static class InfrastructureExtensions
         builder.Services.AddJwt();
 
         builder.AddCustomDbContext<OrderDbContext>(nameof(Order));
+        builder.AddPersistMessageProcessor(nameof(PersistMessage));
+        builder.Services.AddScoped<IEventDispatcher, EventDispatcher>();
+        builder.Services.AddScoped<IIntegrationEventCollector, IntegrationEventCollector>();
+        builder.Services.AddScoped<ICurrentUserProvider, CurrentUserProvider>();
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddAspnetOpenApi();
         builder.Services.AddCustomVersioning();
         builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
         builder.Services.AddCustomMapster(typeof(Program).Assembly);
         builder.Services.AddHttpContextAccessor();
+        builder.Services.AddCustomMassTransit(env, TransportType.RabbitMq, typeof(Program).Assembly);
         
         builder.Services.AddCustomHybridCaching();
         builder.Services.AddGrpcClients();
