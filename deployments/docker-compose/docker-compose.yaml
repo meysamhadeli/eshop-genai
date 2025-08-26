@@ -1,4 +1,4 @@
-name: booking-microservices
+name: eshop-genai
 
 services:
 
@@ -15,7 +15,7 @@ services:
       # volumes:
       #   - rabbitmq:/var/lib/rabbitmq
     networks:
-      - booking
+      - eshop
 
   #######################################################
   #  postgres
@@ -38,7 +38,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
-      - booking
+      - eshop
 
 
   #######################################################
@@ -58,7 +58,7 @@ services:
       ports:
           - "2113:2113"
       networks:
-          - booking
+          - eshop
 
 
   #######################################################
@@ -74,7 +74,7 @@ services:
     ports:
       - 27017:27017
     networks:
-      - booking
+      - eshop
 
 
   #######################################################
@@ -87,7 +87,7 @@ services:
     ports:
       - 6379:6379
     networks:
-      - booking
+      - eshop
 
 
   # #######################################################
@@ -100,7 +100,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     networks:
-      - booking
+      - eshop
 
 
   # #######################################################
@@ -115,7 +115,7 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage  
     networks:
-      - booking
+      - eshop
 
 
   #######################################################
@@ -135,7 +135,7 @@ services:
       - "14318:4318" # OTLP http receiver for jaeger
       # - "9411" # Accepts Zipkin spans - /api/v2/spans
     networks:
-      - booking
+      - eshop
 
 
   #######################################################
@@ -149,7 +149,7 @@ services:
     ports:
       - "9411:9411"
     networks:
-      - booking
+      - eshop
 
 
   #######################################################
@@ -176,7 +176,7 @@ services:
       - "4318:4318" # OTLP http receiver
       - "55679:55679" # zpages extension
     networks:
-      - booking
+      - eshop
 
 
   #######################################################
@@ -202,7 +202,7 @@ services:
       - "--web.enable-remote-write-receiver"
     #   - "--log.level=debug"
     networks:
-      - booking
+      - eshop
 
 
   #######################################################
@@ -225,7 +225,7 @@ services:
     ports:
        - "9101:9100"
     networks:
-      - booking
+      - eshop
 
 
   #######################################################
@@ -257,7 +257,7 @@ services:
       ## https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/
       # - ./../configs/grafana/grafana.ini:/etc/grafana/grafana.ini
     networks:
-      - booking
+      - eshop
 
 
   #######################################################
@@ -279,7 +279,7 @@ services:
       - "24317:4317" # otlp grpc
       - "24318:4318" # otlp http
     networks:
-      - booking
+      - eshop
 
 
   #######################################################
@@ -298,7 +298,7 @@ services:
     volumes:
       - ./../configs/loki-config.yaml:/etc/loki/local-config.yaml
     networks:
-      - booking
+      - eshop
 
 
    #######################################################
@@ -332,7 +332,7 @@ services:
        - ${ELASTIC_HOST_PORT:-9200}:${ELASTIC_PORT:-9200}
        - 9300:9300
      networks:
-       - booking
+       - eshop
 
 
    #######################################################
@@ -350,7 +350,7 @@ services:
      depends_on:
        - elasticsearch
      networks:
-       - booking
+       - eshop
 
 
     #######################################################
@@ -371,7 +371,7 @@ services:
     devices:
       - /dev/kmsg
     networks:
-      - booking
+      - eshop
 
 
   ######################################################
@@ -398,20 +398,20 @@ services:
       - ASPNETCORE_Kestrel__Certificates__Default__Password=password
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
     networks:
-      - booking
+      - eshop
 
 
     #######################################################
-    #  Flight
+    #  Catalog
     #######################################################
-  flight:
-    image: flight
+  catalog:
+    image: catalog
     build:
       args:
         Version: "1"
       context: ../../
-      dockerfile: src/Services/Flight/dev.Dockerfile
-    container_name: flight
+      dockerfile: src/Services/Catalog/dev.Dockerfile
+    container_name: catalog
     ports:
       - 5004:80
       - 5003:443
@@ -425,76 +425,22 @@ services:
       - ASPNETCORE_Kestrel__Certificates__Default__Password=password
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
     networks:
-      - booking
+      - eshop
 
     #######################################################
-    #  Identity
+    #  Basket
     #######################################################
-  identity:
-    image: identity
+  basket:
+    image: basket
     build:
       args:
         Version: "1"
       context: ../../
-      dockerfile: src/Services/Identity/dev.Dockerfile
-    container_name: identity
+      dockerfile: src/Services/Basket/dev.Dockerfile
+    container_name: basket
     ports:
       - 6005:80
       - 5005:443
-    volumes:
-      - ~/.aspnet/https:/https:ro
-    environment:
-      - ASPNETCORE_ENVIRONMENT=docker
-      - ASPNETCORE_URLS=https://+;http://+
-      - ASPNETCORE_HTTPS_PORT=5005
-      - ASPNETCORE_HTTP_PORT=6005
-      - ASPNETCORE_Kestrel__Certificates__Default__Password=password
-      - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
-    networks:
-      - booking
-
-
-    #######################################################
-    #  Passenger
-    #######################################################
-  passenger:
-    image: passenger
-    build:
-      args:
-        Version: "1"
-      context: ../../
-      dockerfile: src/Services/Passenger/dev.Dockerfile
-    container_name: passenger
-    ports:
-      - 6012:80
-      - 5012:443
-    volumes:
-      - ~/.aspnet/https:/https:ro
-    environment:
-      - ASPNETCORE_ENVIRONMENT=docker
-      - ASPNETCORE_URLS=https://+;http://+
-      - ASPNETCORE_HTTPS_PORT=5012
-      - ASPNETCORE_HTTP_PORT=6012
-      - ASPNETCORE_Kestrel__Certificates__Default__Password=password
-      - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
-    networks:
-      - booking
-
-
-    #######################################################
-    #  Booking
-    #######################################################
-  booking:
-    image: booking
-    build:
-      args:
-        Version: "1"
-      context: ../../
-      dockerfile: src/Services/Booking/dev.Dockerfile
-    container_name: booking
-    ports:
-      - 6010:80
-      - 5010:443
     volumes:
       - ~/.aspnet/https:/https:ro
     environment:
@@ -505,12 +451,39 @@ services:
       - ASPNETCORE_Kestrel__Certificates__Default__Password=password
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
     networks:
-      - booking
+      - eshop
 
+
+    #######################################################
+    #  Order
+    #######################################################
+  order:
+    image: order
+    build:
+      args:
+        Version: "1"
+      context: ../../
+      dockerfile: src/Services/Order/dev.Dockerfile
+    container_name: order
+    ports:
+      - 6012:80
+      - 5012:443
+    volumes:
+      - ~/.aspnet/https:/https:ro
+    environment:
+      - ASPNETCORE_ENVIRONMENT=docker
+      - ASPNETCORE_URLS=https://+;http://+
+      - ASPNETCORE_HTTPS_PORT=5020
+      - ASPNETCORE_HTTP_PORT=6020
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=password
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
+    networks:
+      - eshop
+      
 
 networks:
-  booking:
-    name: booking
+  eshop:
+    name: eshop
     driver: bridge
 
 volumes:

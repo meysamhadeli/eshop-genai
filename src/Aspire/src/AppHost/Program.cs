@@ -32,7 +32,7 @@ if (builder.ExecutionContext.IsPublishMode)
 
 
 var catalogDb = postgres.AddDatabase("catalog");
-var basketDb = postgres.AddDatabase("basket");
+var orderDb = postgres.AddDatabase("order");
 
 var redis = builder.AddRedis("redis")
     .WithImage("redis:latest")
@@ -216,23 +216,52 @@ if (builder.ExecutionContext.IsPublishMode)
     kibana.WithLifetime(ContainerLifetime.Persistent);
 }
 
+var ollama = builder.AddOllama("ollama")
+    .WithEndpoint(port: 11434, targetPort: 11434, name: "http", isProxied: true, isExternal: false)
+    .WithDataVolume("ollama-data")
+    .AddModel("nomic-embed-text");
+
+
+var qdrant = builder.AddQdrant("qdrant")
+    .WithEndpoint(port: 6333, targetPort: 6333, name: "http", isProxied: true, isExternal: false)
+    .WithEndpoint(port: 6334, targetPort: 6334, name: "grpc", isProxied: true, isExternal: false)
+    .WithDataVolume("qdrant-data");
+
+if (builder.ExecutionContext.IsPublishMode)
+{
+    qdrant.WithLifetime(ContainerLifetime.Persistent);
+}
+
+
 var catalog = builder.AddProject<Projects.Catalog>("catalog-service")
     .WithReference(catalogDb)
     .WaitFor(catalogDb)
+    .WithReference(ollama)
+    .WaitFor(ollama)
+    .WithReference(qdrant)
+    .WaitFor(qdrant)
     .WithHttpEndpoint(port: 5004, name: "catalog-http")
     .WithHttpsEndpoint(port: 5003, name: "catalog-https");
 
 var basket = builder.AddProject<Projects.Basket>("basket-service")
-    .WithReference(basketDb)
-    .WaitFor(basketDb)
+    .WithReference(redis)
+    .WaitFor(redis)
     .WithHttpEndpoint(port: 6010, name: "basket-http")
     .WithHttpsEndpoint(port: 5010, name: "basket-https");
+
+var order = builder.AddProject<Projects.Order>("order-service")
+    .WithReference(orderDb)
+    .WaitFor(orderDb)
+    .WithHttpEndpoint(port: 6020, name: "order-http")
+    .WithHttpsEndpoint(port: 5020, name: "order-https");
 
 var gateway = builder.AddProject<Projects.ApiGateway>("api-gateway")
     .WithReference(catalog)
     .WaitFor(catalog)
     .WithReference(basket)
     .WaitFor(basket)
+    .WithReference(order)
+    .WaitFor(order)
     .WithHttpEndpoint(port: 5001, name: "gateway-http")
     .WithHttpsEndpoint(port: 5000, name: "gateway-https");
 
