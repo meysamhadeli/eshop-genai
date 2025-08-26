@@ -29,11 +29,11 @@ public class ClearBasketHandler : IRequestHandler<ClearBasket, bool>
     public async Task<bool> Handle(ClearBasket request, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Clearing basket for user: {UserId}", request.UserId);
-        
+
         var isCleared = await _basketRedisService.ClearBasketAsync(request.UserId, cancellationToken);
 
         await _eventDispatcher.SendAsync(new ClearBasketItemIntegrationEvent(request.UserId, isCleared), cancellationToken: cancellationToken);
-            
+
         return isCleared;
     }
 }
@@ -48,7 +48,7 @@ public class ClearBasketEndpoints : IMinimalEndpoint
             CancellationToken cancellationToken) =>
         {
             var result = await mediator.Send(command, cancellationToken);
-            
+
             if (result)
             {
                 return Results.Ok(new { Message = "Basket cleared successfully" });

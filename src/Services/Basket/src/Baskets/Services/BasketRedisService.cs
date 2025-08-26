@@ -29,12 +29,12 @@ public class BasketRedisService : IBasketRedisService
     {
         var key = GetBasketKey(basket.UserId);
         var expiration = expiry ?? _defaultExpiration;
-        
+
         basket.ExpirationTime = DateTime.UtcNow.Add(expiration);
         basket.LastModified = DateTime.UtcNow;
 
         // Use the locked version to prevent race conditions
-        await _hybridCacheProvider.SetWithLockAsync(key, basket, expiration, cancellationToken:cancellationToken);
+        await _hybridCacheProvider.SetWithLockAsync(key, basket, expiration, cancellationToken: cancellationToken);
         return basket;
     }
 

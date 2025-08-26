@@ -23,7 +23,7 @@ public class GetProductsHandler : IRequestHandler<GetProducts, PageList<ProductD
     private readonly ISemanticSearchService _semanticSearchService;
 
     public GetProductsHandler(
-        CatalogDbContext context, 
+        CatalogDbContext context,
         IMapper mapper,
         ISemanticSearchService semanticSearchService)
     {
@@ -38,48 +38,48 @@ public class GetProductsHandler : IRequestHandler<GetProducts, PageList<ProductD
     {
         if (request.UseSemanticSearch && !string.IsNullOrWhiteSpace(request.SearchTerm))
         {
-                    var semanticResults = await _semanticSearchService.SemanticSearchAsync<Product, ProductDto>(
-                        request.SearchTerm, 
-                        maxResults: request.PageSize, 
-                        cancellationToken: cancellationToken);
+            var semanticResults = await _semanticSearchService.SemanticSearchAsync<Product, ProductDto>(
+                request.SearchTerm,
+                maxResults: request.PageSize,
+                cancellationToken: cancellationToken);
 
-                    if (semanticResults.Any())
-                    {
-                        var productIds = semanticResults.Select(p => p.Id).ToList();
-                        
-                        var products = await _context.Products
-                            .Where(p => productIds.Contains(p.Id))
-                            .ToListAsync(cancellationToken);
+            if (semanticResults.Any())
+            {
+                var productIds = semanticResults.Select(p => p.Id).ToList();
 
-                        var productDtos = _mapper.Map<List<ProductDto>>(products);
-                        
-                        var orderedResults = productIds
-                            .Select(id => productDtos.FirstOrDefault(p => p.Id == id))
-                            .Where(p => p != null)
-                            .ToList();
+                var products = await _context.Products
+                    .Where(p => productIds.Contains(p.Id))
+                    .ToListAsync(cancellationToken);
 
-                        return new PageList<ProductDto>(
-                            orderedResults!, 
-                            orderedResults.Count, 
-                            request.PageNumber, 
-                            request.PageSize);
-                    }
+                var productDtos = _mapper.Map<List<ProductDto>>(products);
+
+                var orderedResults = productIds
+                    .Select(id => productDtos.FirstOrDefault(p => p.Id == id))
+                    .Where(p => p != null)
+                    .ToList();
+
+                return new PageList<ProductDto>(
+                    orderedResults!,
+                    orderedResults.Count,
+                    request.PageNumber,
+                    request.PageSize);
+            }
         }
-        
+
         // Fallback to regular search
         return await ExecuteRegularSearchAsync(request, cancellationToken);
     }
 
     private async Task<PageList<ProductDto>> ExecuteRegularSearchAsync(
-        GetProducts request, 
+        GetProducts request,
         CancellationToken cancellationToken)
     {
         var query = _context.Products.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
-            query = query.Where(p => 
-                p.Name.Contains(request.SearchTerm) || 
+            query = query.Where(p =>
+                p.Name.Contains(request.SearchTerm) ||
                 p.Description.Contains(request.SearchTerm));
         }
 
@@ -94,14 +94,14 @@ public class GetProductsHandler : IRequestHandler<GetProducts, PageList<ProductD
         var productDtos = _mapper.Map<List<ProductDto>>(products);
 
         return new PageList<ProductDto>(
-            productDtos, 
-            totalCount, 
-            request.PageNumber, 
+            productDtos,
+            totalCount,
+            request.PageNumber,
             request.PageSize);
     }
 }
 
-public class GetProductsEndpoints: IMinimalEndpoint
+public class GetProductsEndpoints : IMinimalEndpoint
 {
     public IEndpointRouteBuilder MapEndpoint(IEndpointRouteBuilder builder)
     {

@@ -35,22 +35,22 @@ public class AddProductCommandHandler : IRequestHandler<AddProduct, ProductDto>
         CancellationToken cancellationToken)
     {
         var product = new Product
-                      {
-                          Name = request.Name,
-                          Description = request.Description,
-                          Price = request.Price,
-                          ImageUrl = request.ImageUrl
-                      };
+        {
+            Name = request.Name,
+            Description = request.Description,
+            Price = request.Price,
+            ImageUrl = request.ImageUrl
+        };
 
         _context.Products.Add(product);
-        
+
         _integrationEventCollector.AddEvent(new ProductAddedIntegrationEvent(product.Id, product.Name, product.Price, product.ImageUrl, false));
-        
+
         return _mapper.Map<ProductDto>(product);
     }
 }
 
-public class AddProductsEndpoints: IMinimalEndpoint
+public class AddProductsEndpoints : IMinimalEndpoint
 {
     public IEndpointRouteBuilder MapEndpoint(IEndpointRouteBuilder builder)
     {

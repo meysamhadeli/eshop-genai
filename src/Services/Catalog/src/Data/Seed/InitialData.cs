@@ -1,6 +1,6 @@
-using Catalog.Products.Models;
 using System;
 using System.Collections.Generic;
+using Catalog.Products.Models;
 
 namespace Flight.Data.Seed;
 

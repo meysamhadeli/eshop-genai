@@ -4,7 +4,7 @@ using Microsoft.SemanticKernel.Embeddings;
 
 namespace BuildingBlocks.AI.SemanticSearch.Providers;
 
-public class OpenAIStrategy: IAIProviders
+public class OpenAIStrategy : IAIProviders
 {
     private readonly SemanticSearchOptions _options;
 
@@ -24,7 +24,7 @@ public class OpenAIStrategy: IAIProviders
 
         return kernel.GetRequiredService<ITextEmbeddingGenerationService>();
     }
-    
+
     public IChatCompletionService CreateChatProvider()
     {
         var kernel = Kernel.CreateBuilder()

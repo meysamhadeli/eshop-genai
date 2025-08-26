@@ -88,7 +88,7 @@ public class CreateOrderCommandHandler : IRequestHandler<CreateOrder, OrderDto>
         };
 
         _orderDbContext.Orders.Add(order);
-        
+
         _integrationEventCollector.AddEvent(new OrderCreatedIntegrationEvent(order.Id, order.UserId, order.Status, order.TotalAmount, order.ShippingAddress, order.OrderDate, order.Items, order.IsDeleted));
 
         await _basketGrpcServiceClient.ClearBasketAsync(new ClearBasketRequest { UserId = request.UserId }, cancellationToken: cancellationToken);

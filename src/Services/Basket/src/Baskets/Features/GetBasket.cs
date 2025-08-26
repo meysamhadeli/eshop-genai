@@ -32,7 +32,7 @@ public class GetBasketQueryHandler : IRequestHandler<GetBasket, BasketDto>
         if (basket == null)
         {
             return new BasketDto(
-                Guid.CreateVersion7(), 
+                Guid.CreateVersion7(),
                 request.UserId,
                 new List<BasketItemsDto>(),
                 DateTime.UtcNow,
@@ -44,9 +44,9 @@ public class GetBasketQueryHandler : IRequestHandler<GetBasket, BasketDto>
 
         foreach (var item in basket.Items)
         {
-            var product = await _catalogGrpcServiceClient.GetProductByIdAsync(new GetProductByIdRequest(){Id = item.ProductId.ToString()});
+            var product = await _catalogGrpcServiceClient.GetProductByIdAsync(new GetProductByIdRequest() { Id = item.ProductId.ToString() });
             var basketItem = basket.Items.First(x => x.ProductId == new Guid(product.ProductDto.Id));
-            basketDto.Items.Add(new BasketItemsDto( basketItem.ProductId, product.ProductDto.Name, (decimal)product.ProductDto.Price, product.ProductDto.ImageUrl, basketItem.Quantity));
+            basketDto.Items.Add(new BasketItemsDto(basketItem.ProductId, product.ProductDto.Name, (decimal)product.ProductDto.Price, product.ProductDto.ImageUrl, basketItem.Quantity));
         }
 
 
@@ -74,7 +74,7 @@ public class GetBasketEndpoints : IMinimalEndpoint
             .WithDescription("Get Basket Items")
             .WithOpenApi()
             .HasApiVersion(1.0);
-        
+
         return builder;
     }
 }

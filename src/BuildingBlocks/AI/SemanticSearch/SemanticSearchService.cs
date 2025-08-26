@@ -23,7 +23,7 @@ public interface ISemanticSearchService
     Task IndexAsync<T>(T entity, CancellationToken cancellationToken = default) where T : class;
     Task UpdateAsync<T>(T entity, CancellationToken cancellationToken = default) where T : class;
     Task DeleteAsync<T>(object id, CancellationToken cancellationToken = default) where T : class;
-    
+
     Task EnsureCollectionExists<T>(CancellationToken cancellationToken = default) where T : class;
     Task<bool> CollectionExistsAsync<T>(CancellationToken cancellationToken = default) where T : class;
     Task DeleteCollectionAsync<T>(CancellationToken cancellationToken = default) where T : class;
@@ -74,7 +74,7 @@ public class SemanticSearchService : ISemanticSearchService
         try
         {
             var collectionName = GetCollectionName<T>();
-            
+
             // Check if collection exists before searching
             var collectionExists = await _qdrantClient.CollectionExistsAsync(collectionName, cancellationToken);
             if (!collectionExists)
@@ -84,7 +84,7 @@ public class SemanticSearchService : ISemanticSearchService
             }
 
             var queryEmbedding = await _embeddingService.GenerateEmbeddingAsync(query, cancellationToken: cancellationToken);
-            
+
             var searchResult = await _qdrantClient.SearchAsync(
                 collectionName: collectionName,
                 vector: queryEmbedding.ToArray(),
@@ -131,18 +131,18 @@ public class SemanticSearchService : ISemanticSearchService
         {
             // Ensure collection exists before indexing
             await EnsureCollectionExists<T>(cancellationToken);
-            
+
             var collectionName = GetCollectionName<T>();
             var entityId = GetEntityId(entity);
             var text = GenerateSearchText(entity);
-            
+
             var embedding = await _embeddingService.GenerateEmbeddingAsync(text, cancellationToken: cancellationToken);
-            
+
             var point = new PointStruct
             {
-                Id = new PointId{Uuid = entityId},
+                Id = new PointId { Uuid = entityId },
                 Vectors = embedding.ToArray(),
-                Payload = 
+                Payload =
                 {
                     ["text"] = text,
                     ["entity"] = JsonSerializer.Serialize(entity),
@@ -152,7 +152,7 @@ public class SemanticSearchService : ISemanticSearchService
             };
 
             await _qdrantClient.UpsertAsync(collectionName, new[] { point }, cancellationToken: cancellationToken);
-            
+
             _logger.LogDebug("Entity {EntityId} indexed successfully in collection {Collection}", entityId, collectionName);
         }
         catch (System.Exception ex)
@@ -187,9 +187,9 @@ public class SemanticSearchService : ISemanticSearchService
             var collectionName = GetCollectionName<T>();
             await _qdrantClient.DeleteAsync(
                 collectionName: collectionName,
-                id: new PointId{Uuid = id.ToString()},
+                id: new PointId { Uuid = id.ToString() },
                 cancellationToken: cancellationToken);
-            
+
             _logger.LogDebug("Entity {EntityId} deleted from collection {Collection}", id, collectionName);
         }
         catch (System.Exception ex)
@@ -203,11 +203,11 @@ public class SemanticSearchService : ISemanticSearchService
         if (!_isEnabled) return;
 
         var collectionName = GetCollectionName<T>();
-        
+
         try
         {
             var collectionExists = await _qdrantClient.CollectionExistsAsync(collectionName, cancellationToken);
-            
+
             if (!collectionExists)
             {
                 await _qdrantClient.CreateCollectionAsync(
@@ -218,8 +218,8 @@ public class SemanticSearchService : ISemanticSearchService
                         Distance = Distance.Cosine
                     },
                     cancellationToken: cancellationToken);
-                
-                _logger.LogInformation("Created collection {CollectionName} with vector size {VectorSize}", 
+
+                _logger.LogInformation("Created collection {CollectionName} with vector size {VectorSize}",
                     collectionName, _options.VectorSize);
             }
         }
@@ -254,11 +254,11 @@ public class SemanticSearchService : ISemanticSearchService
         var collections = await _qdrantClient.ListCollectionsAsync(cancellationToken);
         return collections.ToList();
     }
-    
+
     private string GetCollectionName<T>() where T : class
     {
         var typeName = typeof(T).Name.ToLowerInvariant();
-        
+
         // Remove common suffixes
         var suffixesToRemove = new[] { "dto", "model", "entity", "record", "viewmodel" };
         foreach (var suffix in suffixesToRemove)
@@ -269,7 +269,7 @@ public class SemanticSearchService : ISemanticSearchService
                 break;
             }
         }
-        
+
         return $"{_options.DefaultCollectionPrefix}{typeName}";
     }
 
@@ -287,7 +287,7 @@ public class SemanticSearchService : ISemanticSearchService
     {
         // Create searchable text from entity properties
         var properties = typeof(T).GetProperties()
-            .Where(p => p.PropertyType == typeof(string) && 
+            .Where(p => p.PropertyType == typeof(string) &&
                        !p.Name.Equals("Id", StringComparison.OrdinalIgnoreCase))
             .Select(p => p.GetValue(entity)?.ToString())
             .Where(value => !string.IsNullOrEmpty(value));

@@ -16,10 +16,10 @@ public static class Extensions
         services.AddHybridCache(options =>
                                 {
                                     options.DefaultEntryOptions = new HybridCacheEntryOptions
-                                                                  {
-                                                                      Expiration =TimeSpan.FromMinutes(hybridCacheOptions.RedisExpireMinutes ?? 5),
-                                                                      LocalCacheExpiration = TimeSpan.FromMinutes(hybridCacheOptions.InMemoryExpireMinutes ?? 2)
-                                                                  };
+                                    {
+                                        Expiration = TimeSpan.FromMinutes(hybridCacheOptions.RedisExpireMinutes ?? 5),
+                                        LocalCacheExpiration = TimeSpan.FromMinutes(hybridCacheOptions.InMemoryExpireMinutes ?? 2)
+                                    };
                                 });
 
         if (!string.IsNullOrEmpty(hybridCacheOptions.RedisConnectionString))
@@ -44,7 +44,7 @@ public static class Extensions
         }
 
         services.AddSingleton<IHybridCacheProvider, HybridCacheProvider>();
-        
+
         return services;
     }
 }

@@ -54,7 +54,7 @@ where TResponse : notnull
         while (true)
         {
             var integrationEvents = integrationEventCollector.GetEvents().ToList();
-            
+
             if (integrationEvents is null || !integrationEvents.Any())
             {
                 return response;
