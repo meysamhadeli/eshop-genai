@@ -84,7 +84,7 @@
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.11.1" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.11.1"/>
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.11.0"/>
-    <PackageReference Include="OpenTelemetry.Instrumentation.GrpcNetClient" Version="1.11.0-beta.1"/>
+    <PackageReference Include="OpenTelemetry.Instrumentation.GrpcNetClient" Version="1.12.0-beta.1"/>
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.11.0"/>
     <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="1.11.0-beta.1"/>
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.11.0"/>
@@ -93,7 +93,7 @@
     <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.11.1"/>
     <PackageReference Include="OpenTelemetry.Exporter.Zipkin" Version="1.11.1"/>
 
-    <PackageReference Include="EventStore.Client.Grpc.Streams" Version="23.3.7" />
+    <PackageReference Include="EventStore.Client.Grpc.Streams" Version="23.3.9" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.1" />
 
     <PackageReference Include="AutoBogus" Version="2.13.1" />
@@ -105,7 +105,7 @@
     <PackageReference Include="WebMotions.Fake.Authentication.JwtBearer" Version="8.0.1" />
 
     <PackageReference Include="Google.Protobuf" Version="3.32.0" />
-    <PackageReference Include="Grpc.Net.ClientFactory" Version="2.67.0" />
+    <PackageReference Include="Grpc.Net.ClientFactory" Version="2.71.0" />
 
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
       <PrivateAssets>all</PrivateAssets>
