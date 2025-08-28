@@ -44,7 +44,7 @@ public class AddProductCommandHandler : IRequestHandler<AddProduct, ProductDto>
 
         _context.Products.Add(product);
 
-        _integrationEventCollector.AddEvent(new ProductAddedIntegrationEvent(product.Id, product.Name, product.Price, product.ImageUrl, false));
+        _integrationEventCollector.AddIntegrationEvent(new ProductAddedIntegrationEvent(product.Id, product.Name, product.Price, product.ImageUrl, false));
 
         return _mapper.Map<ProductDto>(product);
     }

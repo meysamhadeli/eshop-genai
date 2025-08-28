@@ -50,6 +50,7 @@ public static class InfrastructureExtensions
 
         builder.AddPersistMessageProcessor(nameof(PersistMessage));
         builder.Services.AddScoped<IEventDispatcher, EventDispatcher>();
+        builder.Services.AddScoped<IIntegrationEventCollector, IntegrationEventCollector>();
         builder.Services.AddScoped<ICurrentUserProvider, CurrentUserProvider>();
 
         builder.Services.AddCustomHybridCaching();

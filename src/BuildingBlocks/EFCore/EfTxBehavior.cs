@@ -1,7 +1,6 @@
 using System.Text.Json;
 using System.Transactions;
 using BuildingBlocks.Core;
-using BuildingBlocks.PersistMessageProcessor;
 using BuildingBlocks.Polly;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -9,13 +8,11 @@ using Microsoft.Extensions.Logging;
 namespace BuildingBlocks.EFCore;
 
 
-public class EfTxIntegrationEventBehavior<TRequest, TResponse>(
-    ILogger<EfTxIntegrationEventBehavior<TRequest, TResponse>> logger,
-    IDbContext dbContextBase,
-    IPersistMessageDbContext persistMessageDbContext,
-    IIntegrationEventCollector integrationEventCollector,
-    IEventDispatcher eventDispatcher
-)
+public class EfTxBehavior<TRequest, TResponse>(
+    ILogger<EfTxBehavior<TRequest, TResponse>> logger,
+    IEventDispatcher eventDispatcher,
+    IDbContext? dbContextBase = null,
+    IIntegrationEventCollector? integrationEventCollector = null)
     : IPipelineBehavior<TRequest, TResponse>
 where TRequest : notnull, IRequest<TResponse>
 where TResponse : notnull
@@ -25,18 +22,18 @@ where TResponse : notnull
     {
         logger.LogInformation(
             "{Prefix} Handled command {MediatrRequest}",
-            nameof(EfTxDomainEventBehavior<TRequest, TResponse>),
+            nameof(EfTxBehavior<TRequest, TResponse>),
             typeof(TRequest).FullName);
 
         logger.LogDebug(
             "{Prefix} Handled command {MediatrRequest} with content {RequestContent}",
-            nameof(EfTxDomainEventBehavior<TRequest, TResponse>),
+            nameof(EfTxBehavior<TRequest, TResponse>),
             typeof(TRequest).FullName,
             JsonSerializer.Serialize(request));
 
         logger.LogInformation(
             "{Prefix} Open the transaction for {MediatrRequest}",
-            nameof(EfTxDomainEventBehavior<TRequest, TResponse>),
+            nameof(EfTxBehavior<TRequest, TResponse>),
             typeof(TRequest).FullName);
 
         //ref: https://learn.microsoft.com/en-us/ef/core/saving/transactions#using-systemtransactions
@@ -48,32 +45,40 @@ where TResponse : notnull
 
         logger.LogInformation(
             "{Prefix} Executed the {MediatrRequest} request",
-            nameof(EfTxDomainEventBehavior<TRequest, TResponse>),
+            nameof(EfTxBehavior<TRequest, TResponse>),
             typeof(TRequest).FullName);
-
+        
         while (true)
         {
-            var integrationEvents = integrationEventCollector.GetEvents().ToList();
-
-            if (integrationEvents is null || !integrationEvents.Any())
+            if (integrationEventCollector is not null)
             {
-                return response;
+                var integrationEvents = integrationEventCollector.GetIntegrationEvents();
+
+                if (!integrationEvents.Any())
+                {
+                    return response;
+                }
+                
+                await eventDispatcher.SendAsync(integrationEvents.ToArray(), typeof(TRequest), cancellationToken);
             }
-
-            await eventDispatcher.SendAsync(integrationEvents.ToArray(), typeof(TRequest), cancellationToken);
-
-            // Save data to database with some retry policy in distributed transaction
-            await dbContextBase.RetryOnFailure(async () =>
+            else
             {
-                await dbContextBase.SaveChangesAsync(cancellationToken);
-            });
+                var domainEvents = dbContextBase?.GetDomainEvents();
 
+                if (domainEvents != null && !domainEvents.Any())
+                {
+                    return response;
+                }   
+                
+                await eventDispatcher.SendAsync(domainEvents.ToArray(), typeof(TRequest), cancellationToken);
+            }
+            
             // Save data to database with some retry policy in distributed transaction
-            await persistMessageDbContext.RetryOnFailure(async () =>
+            if (dbContextBase != null)
             {
-                await persistMessageDbContext.SaveChangesAsync(cancellationToken);
-            });
-
+                await dbContextBase.RetryOnFailure(async () => await dbContextBase.SaveChangesAsync(cancellationToken));
+            }
+            
             scope.Complete();
 
             return response;
