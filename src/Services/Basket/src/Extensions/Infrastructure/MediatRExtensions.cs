@@ -15,6 +15,7 @@ public static class MediatRExtensions
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(CachingBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(InvalidateCachingBehavior<,>));
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(EfTxBehavior<,>));
 
         return services;
     }

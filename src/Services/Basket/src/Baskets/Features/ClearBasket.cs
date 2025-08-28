@@ -14,16 +14,16 @@ public class ClearBasketHandler : IRequestHandler<ClearBasket, bool>
 {
     private readonly IBasketRedisService _basketRedisService;
     private readonly ILogger<ClearBasketHandler> _logger;
-    private readonly IEventDispatcher _eventDispatcher;
+    private readonly IIntegrationEventCollector _integrationEventCollector;
 
     public ClearBasketHandler(
         IBasketRedisService basketRedisService,
         ILogger<ClearBasketHandler> logger,
-        IEventDispatcher eventDispatcher)
+        IIntegrationEventCollector integrationEventCollector)
     {
         _basketRedisService = basketRedisService;
         _logger = logger;
-        _eventDispatcher = eventDispatcher;
+        _integrationEventCollector = integrationEventCollector;
     }
 
     public async Task<bool> Handle(ClearBasket request, CancellationToken cancellationToken)
@@ -32,7 +32,7 @@ public class ClearBasketHandler : IRequestHandler<ClearBasket, bool>
 
         var isCleared = await _basketRedisService.ClearBasketAsync(request.UserId, cancellationToken);
 
-        await _eventDispatcher.SendAsync(new ClearBasketItemIntegrationEvent(request.UserId, isCleared), cancellationToken: cancellationToken);
+        _integrationEventCollector.AddIntegrationEvent(new ClearBasketItemIntegrationEvent(request.UserId, isCleared));
 
         return isCleared;
     }

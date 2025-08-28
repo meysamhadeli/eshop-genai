@@ -23,19 +23,19 @@ public class UpdateItemCommandHandler : IRequestHandler<UpdateItem, BasketDto>
     private readonly IBasketRedisService _basketRedisService;
     private readonly CatalogGrpcService.CatalogGrpcServiceClient _catalogGrpcService;
     private readonly IMapper _mapper;
-    private readonly IEventDispatcher _eventDispatcher;
+    private readonly IIntegrationEventCollector _integrationEventCollector;
     private readonly TimeSpan _basketExpiry = TimeSpan.FromHours(1);
 
     public UpdateItemCommandHandler(
         IBasketRedisService basketRedisService,
         CatalogGrpcService.CatalogGrpcServiceClient catalogGrpcService,
         IMapper mapper,
-        IEventDispatcher eventDispatcher)
+        IIntegrationEventCollector integrationEventCollector)
     {
         _basketRedisService = basketRedisService;
         _catalogGrpcService = catalogGrpcService;
         _mapper = mapper;
-        _eventDispatcher = eventDispatcher;
+        _integrationEventCollector = integrationEventCollector;
     }
 
     public async Task<BasketDto> Handle(UpdateItem request, CancellationToken cancellationToken)
@@ -95,7 +95,7 @@ public class UpdateItemCommandHandler : IRequestHandler<UpdateItem, BasketDto>
         // Save basket with TTL
         var updatedBasket = await _basketRedisService.SaveBasketAsync(basket, _basketExpiry, cancellationToken);
 
-        await _eventDispatcher.SendAsync(new UpdatedBasketItemIntegrationEvent(updatedBasket.Id, updatedBasket.UserId, updatedBasket.Items, updatedBasket.ExpirationTime, updatedBasket.IsDeleted));
+        _integrationEventCollector.AddIntegrationEvent(new UpdatedBasketItemIntegrationEvent(updatedBasket.Id, updatedBasket.UserId, updatedBasket.Items, updatedBasket.ExpirationTime, updatedBasket.IsDeleted));
 
         return _mapper.Map<BasketDto>(updatedBasket);
     }
