@@ -47,7 +47,7 @@ where TResponse : notnull
             "{Prefix} Executed the {MediatrRequest} request",
             nameof(EfTxBehavior<TRequest, TResponse>),
             typeof(TRequest).FullName);
-        
+
         while (true)
         {
             if (integrationEventCollector is not null)
@@ -58,7 +58,7 @@ where TResponse : notnull
                 {
                     return response;
                 }
-                
+
                 await eventDispatcher.SendAsync(integrationEvents.ToArray(), typeof(TRequest), cancellationToken);
             }
             else
@@ -68,17 +68,17 @@ where TResponse : notnull
                 if (domainEvents != null && !domainEvents.Any())
                 {
                     return response;
-                }   
-                
+                }
+
                 await eventDispatcher.SendAsync(domainEvents.ToArray(), typeof(TRequest), cancellationToken);
             }
-            
+
             // Save data to database with some retry policy in distributed transaction
             if (dbContextBase != null)
             {
                 await dbContextBase.RetryOnFailure(async () => await dbContextBase.SaveChangesAsync(cancellationToken));
             }
-            
+
             scope.Complete();
 
             return response;

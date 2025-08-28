@@ -19,7 +19,7 @@ public class IntegrationEventCollector : IIntegrationEventCollector
     public IReadOnlyList<IIntegrationEvent> GetIntegrationEvents()
     {
         var integrationEvents = _events.ToImmutableList();
-        
+
         ClearIntegrationEvents();
 
         return integrationEvents;
