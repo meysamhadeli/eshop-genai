@@ -94,7 +94,7 @@ public class UpdateItemCommandHandler : IRequestHandler<UpdateItem, BasketDto>
         // Save basket with TTL
         var updatedBasket = await _basketRedisService.SaveBasketAsync(basket, _basketExpiry, cancellationToken);
 
-        _integrationEventCollector.AddIntegrationEvent(new UpdatedBasketItemsIntegrationEvent(updatedBasket.Id, updatedBasket.UserId, updatedBasket?.Items?.Adapt<ICollection<BasketItemsIntegrationEvent>>() , updatedBasket.ExpirationTime, updatedBasket.IsDeleted));
+        _integrationEventCollector.AddIntegrationEvent(new UpdatedBasketItemsIntegrationEvent(updatedBasket.Id, updatedBasket.UserId, updatedBasket?.Items?.Adapt<ICollection<BasketItemsIntegrationEvent>>(), updatedBasket.ExpirationTime, updatedBasket.IsDeleted));
 
         return _mapper.Map<BasketDto>(updatedBasket);
     }

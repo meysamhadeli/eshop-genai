@@ -28,7 +28,7 @@ public static class Extensions
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
             services.AddMassTransitOutboxDbContext(configuration);
         }
-        
+
         if (env.IsEnvironment("test"))
         {
             services.AddMassTransitTestHarness(
@@ -57,7 +57,7 @@ public static class Extensions
     )
     {
         configure.AddConsumers(assembly);
-        
+
         if (transportType != TransportType.InMemory)
         {
             var outboxOptions = services.GetOptions<PostgresOutboxOptions>(nameof(PostgresOutboxOptions));
@@ -76,10 +76,10 @@ public static class Extensions
                    busOutboxConfig.MessageDeliveryLimit = outboxOptions.MessageDeliveryLimit ?? 10;
                });
             });
-            
+
             configure.AddConfigureEndpointsCallback((context, name, cfg) => cfg.UseEntityFrameworkOutbox<OutboxDbContext>(context));
         }
-        
+
         switch (transportType)
         {
             case TransportType.RabbitMq:

@@ -25,10 +25,10 @@ public static class OutboxDbContextExtensions
             throw new InvalidOperationException("PostgresOutboxOptions.ConnectionString is required");
         }
 
-        services.AddDbContext<OutboxDbContext>(options => 
+        services.AddDbContext<OutboxDbContext>(options =>
         {
             options.UseNpgsql(outboxOptions.ConnectionString);
-            
+
             options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
         });
 
@@ -55,11 +55,11 @@ public class OutboxDatabaseInitializer : IHostedService
         {
             using var scope = _serviceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<OutboxDbContext>();
-            
+
             _logger.LogInformation("Ensuring outbox database exists and migrations are applied...");
-            
+
             await dbContext.Database.MigrateAsync(cancellationToken);
-            
+
             _logger.LogInformation("Outbox database migrations applied successfully");
         }
         catch (System.Exception ex)

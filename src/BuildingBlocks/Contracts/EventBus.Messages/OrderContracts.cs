@@ -14,7 +14,7 @@ public record OrderItemIntegrationEvent
     public int Quantity { get; set; }
     public decimal TotalPrice { get; set; }
     public string ImageUrl { get; set; }
-} 
+}
 
 public enum OrderStatusIntegrationEvent
 {

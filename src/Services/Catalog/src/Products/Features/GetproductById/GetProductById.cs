@@ -25,7 +25,7 @@ public class GetProductByIdHandler : IRequestHandler<GetProductById, ProductDto>
 
     public async Task<ProductDto> Handle(GetProductById request, CancellationToken cancellationToken)
     {
-        var product = await _catalogReadDbContext.Product.AsQueryable().FirstOrDefaultAsync(x=> x.Id == request.ProductId, cancellationToken);
+        var product = await _catalogReadDbContext.Product.AsQueryable().FirstOrDefaultAsync(x => x.Id == request.ProductId, cancellationToken);
 
         if (product == null)
         {

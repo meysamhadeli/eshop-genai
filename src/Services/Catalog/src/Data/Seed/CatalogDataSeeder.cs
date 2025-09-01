@@ -49,7 +49,7 @@ public class CatalogDataSeeder : IDataSeeder
         {
             await _catalogDbContext.Products.AddRangeAsync(InitialData.Products);
             await _catalogDbContext.SaveChangesAsync();
-            
+
             await SeedMongoProducts();
 
             await SeedSemanticSearchProductsAsync();

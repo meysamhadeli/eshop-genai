@@ -431,7 +431,7 @@ where TEntryPoint : class
         {
             _outboxDbConnection = new NpgsqlConnection(outboxOptions.ConnectionString);
             await _outboxDbConnection.OpenAsync();
-            _respawnerOutboxDb = await Respawner.CreateAsync(_outboxDbConnection, 
+            _respawnerOutboxDb = await Respawner.CreateAsync(_outboxDbConnection,
                 new RespawnerOptions { DbAdapter = DbAdapter.Postgres });
         }
 
@@ -439,7 +439,7 @@ where TEntryPoint : class
         {
             _defaultDbConnection = new NpgsqlConnection(postgresOptions.ConnectionString);
             await _defaultDbConnection.OpenAsync();
-            _respawnerDefaultDb = await Respawner.CreateAsync(_defaultDbConnection, 
+            _respawnerDefaultDb = await Respawner.CreateAsync(_defaultDbConnection,
                 new RespawnerOptions { DbAdapter = DbAdapter.Postgres });
 
             await SeedDataAsync();

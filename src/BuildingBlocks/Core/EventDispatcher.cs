@@ -22,11 +22,11 @@ public sealed class EventDispatcher(
         }
     }
 
-    public async Task SendAsync<T>(T @event, Type type = null, CancellationToken cancellationToken = default) 
+    public async Task SendAsync<T>(T @event, Type type = null, CancellationToken cancellationToken = default)
     where T : IEvent =>
         await SendAsync(new[] { @event }, type, cancellationToken);
 
-    
+
     private void SetHeaders(SendContext context)
     {
         context.Headers.Set("CorrelationId", httpContextAccessor?.HttpContext?.GetCorrelationId());

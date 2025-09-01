@@ -2,7 +2,7 @@ using BuildingBlocks.Core.Model;
 
 namespace Catalog.Products.Models;
 
-public record ProductReadModel: Entity<Guid>
+public record ProductReadModel : Entity<Guid>
 {
     public string Name { get; init; }
     public string Description { get; init; }
