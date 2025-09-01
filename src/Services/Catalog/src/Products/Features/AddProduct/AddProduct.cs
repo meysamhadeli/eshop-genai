@@ -1,3 +1,4 @@
+using BuildingBlocks.Contracts.EventBus.Messages;
 using BuildingBlocks.Core;
 using BuildingBlocks.Core.Event;
 using BuildingBlocks.Web;
@@ -7,7 +8,7 @@ using Catalog.Products.Models;
 using MapsterMapper;
 using MediatR;
 
-namespace Catalog.Products.Features;
+namespace Catalog.Products.Features.AddProduct;
 
 public record AddProduct(
     string Name,
@@ -15,7 +16,6 @@ public record AddProduct(
     decimal Price,
     string ImageUrl) : IRequest<ProductDto>;
 
-public record ProductAddedIntegrationEvent(Guid Id, string Name, decimal Price, string ImageUrl, bool IsDeleted) : IIntegrationEvent;
 
 public class AddProductCommandHandler : IRequestHandler<AddProduct, ProductDto>
 {
@@ -44,7 +44,7 @@ public class AddProductCommandHandler : IRequestHandler<AddProduct, ProductDto>
 
         _context.Products.Add(product);
 
-        _integrationEventCollector.AddIntegrationEvent(new ProductAddedIntegrationEvent(product.Id, product.Name, product.Price, product.ImageUrl, false));
+        _integrationEventCollector.AddIntegrationEvent(new ProductAddedIntegrationEvent(product.Id, product.Name, product.Description, product.Price, product.ImageUrl, false));
 
         return _mapper.Map<ProductDto>(product);
     }

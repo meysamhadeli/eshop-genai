@@ -1,8 +1,9 @@
 using Basket;
+using BuildingBlocks.Contracts.EventBus.Messages;
 using BuildingBlocks.Core;
-using BuildingBlocks.Core.Event;
 using BuildingBlocks.Web;
 using Catalog;
+using Mapster;
 using MapsterMapper;
 using MediatR;
 using Order.Data;
@@ -13,10 +14,6 @@ using Order.Orders.Models;
 
 namespace Order.Orders.Features;
 public record CreateOrder(string UserId, string ShippingAddress) : IRequest<OrderDto>;
-
-public record OrderCreatedIntegrationEvent(Guid Id, string UserId, OrderStatus Status, decimal TotalAmount, string ShippingAddress,
-                                       DateTime OrderDate, ICollection<OrderItem> Items, bool IsDeleted) : IIntegrationEvent;
-
 
 public class CreateOrderCommandHandler : IRequestHandler<CreateOrder, OrderDto>
 {
@@ -89,7 +86,7 @@ public class CreateOrderCommandHandler : IRequestHandler<CreateOrder, OrderDto>
 
         _orderDbContext.Orders.Add(order);
 
-        _integrationEventCollector.AddIntegrationEvent(new OrderCreatedIntegrationEvent(order.Id, order.UserId, order.Status, order.TotalAmount, order.ShippingAddress, order.OrderDate, order.Items, order.IsDeleted));
+        _integrationEventCollector.AddIntegrationEvent(new OrderCreatedIntegrationEvent(order.Id, order.UserId, order.Status.Adapt<OrderStatusIntegrationEvent>(), order.TotalAmount, order.ShippingAddress, order.OrderDate, order.Items.Adapt<ICollection<OrderItemIntegrationEvent>>(), order.IsDeleted));
 
         await _basketGrpcServiceClient.ClearBasketAsync(new ClearBasketRequest { UserId = request.UserId }, cancellationToken: cancellationToken);
 

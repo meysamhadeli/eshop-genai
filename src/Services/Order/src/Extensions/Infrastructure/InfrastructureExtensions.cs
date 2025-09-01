@@ -5,7 +5,6 @@ using BuildingBlocks.Jwt;
 using BuildingBlocks.Mapster;
 using BuildingBlocks.MassTransit;
 using BuildingBlocks.OpenApi;
-using BuildingBlocks.PersistMessageProcessor;
 using BuildingBlocks.ProblemDetails;
 using BuildingBlocks.Web;
 using Figgle;
@@ -48,7 +47,6 @@ public static class InfrastructureExtensions
         builder.Services.AddJwt();
 
         builder.AddCustomDbContext<OrderDbContext>(nameof(Order));
-        builder.AddPersistMessageProcessor(nameof(PersistMessage));
         builder.Services.AddScoped<IEventDispatcher, EventDispatcher>();
         builder.Services.AddScoped<IIntegrationEventCollector, IntegrationEventCollector>();
         builder.Services.AddScoped<ICurrentUserProvider, CurrentUserProvider>();

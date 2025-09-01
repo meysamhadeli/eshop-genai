@@ -5,28 +5,27 @@ using Catalog.Products.Dtos;
 using Catalog.Products.Exceptions;
 using MapsterMapper;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
+using MongoDB.Driver.Linq;
 
-namespace Catalog.Products.Features;
+namespace Catalog.Products.Features.GetproductById;
 
 public record GetProductById(Guid ProductId) : IRequest<ProductDto>;
 
 public class GetProductByIdHandler : IRequestHandler<GetProductById, ProductDto>
 {
-    private readonly CatalogDbContext _context;
+    private readonly CatalogReadDbContext _catalogReadDbContext;
     private readonly IMapper _mapper;
 
-    public GetProductByIdHandler(CatalogDbContext context, IMapper mapper)
+    public GetProductByIdHandler(CatalogDbContext context, IMapper mapper, CatalogReadDbContext catalogReadDbContext)
     {
-        _context = context;
+        _catalogReadDbContext = catalogReadDbContext;
         _mapper = mapper;
     }
 
-    public async Task<ProductDto> Handle(
-        GetProductById request,
-        CancellationToken cancellationToken)
+    public async Task<ProductDto> Handle(GetProductById request, CancellationToken cancellationToken)
     {
-        var product = await _context.Products.FindAsync(request.ProductId, cancellationToken);
+        var product = await _catalogReadDbContext.Product.AsQueryable().FirstOrDefaultAsync(x=> x.Id == request.ProductId, cancellationToken);
 
         if (product == null)
         {

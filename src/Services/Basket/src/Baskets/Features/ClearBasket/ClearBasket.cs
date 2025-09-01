@@ -1,14 +1,12 @@
 using Basket.Infrastructure.Redis;
+using BuildingBlocks.Contracts.EventBus.Messages;
 using BuildingBlocks.Core;
-using BuildingBlocks.Core.Event;
 using BuildingBlocks.Web;
 using MediatR;
 
 namespace Basket.Baskets.Features;
 
 public record ClearBasket(string UserId) : IRequest<bool>;
-
-public record ClearBasketItemIntegrationEvent(string UserId, bool IsCleared) : IIntegrationEvent;
 
 public class ClearBasketHandler : IRequestHandler<ClearBasket, bool>
 {

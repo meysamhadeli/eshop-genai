@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Transactions;
 using BuildingBlocks.Core;
+using BuildingBlocks.MassTransit;
 using BuildingBlocks.Polly;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -12,6 +13,7 @@ public class EfTxBehavior<TRequest, TResponse>(
     ILogger<EfTxBehavior<TRequest, TResponse>> logger,
     IEventDispatcher eventDispatcher,
     IDbContext? dbContextBase = null,
+    OutboxDbContext? outboxDbContext = null,
     IIntegrationEventCollector? integrationEventCollector = null)
     : IPipelineBehavior<TRequest, TResponse>
 where TRequest : notnull, IRequest<TResponse>
@@ -73,10 +75,14 @@ where TResponse : notnull
                 await eventDispatcher.SendAsync(domainEvents.ToArray(), typeof(TRequest), cancellationToken);
             }
 
-            // Save data to database with some retry policy in distributed transaction
             if (dbContextBase != null)
             {
                 await dbContextBase.RetryOnFailure(async () => await dbContextBase.SaveChangesAsync(cancellationToken));
+            }
+
+            if (outboxDbContext != null)
+            {
+                await outboxDbContext.RetryOnFailure(async () => await outboxDbContext.SaveChangesAsync(cancellationToken));
             }
 
             scope.Complete();

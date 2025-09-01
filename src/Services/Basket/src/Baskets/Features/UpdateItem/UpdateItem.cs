@@ -2,10 +2,11 @@ using Basket.Baskets.Dtos;
 using Basket.Baskets.Exceptions;
 using Basket.Baskets.Models;
 using Basket.Infrastructure.Redis;
+using BuildingBlocks.Contracts.EventBus.Messages;
 using BuildingBlocks.Core;
-using BuildingBlocks.Core.Event;
 using BuildingBlocks.Web;
 using Catalog;
+using Mapster;
 using MapsterMapper;
 using MediatR;
 
@@ -15,8 +16,6 @@ public record UpdateItem(
     string UserId,
     Guid ProductId,
     int Quantity = 0) : IRequest<BasketDto>;
-
-public record UpdatedBasketItemIntegrationEvent(Guid Id, string UserId, ICollection<BasketItems> Items, DateTime? ExpirationTime, bool IsDeleted) : IIntegrationEvent;
 
 public class UpdateItemCommandHandler : IRequestHandler<UpdateItem, BasketDto>
 {
@@ -95,7 +94,7 @@ public class UpdateItemCommandHandler : IRequestHandler<UpdateItem, BasketDto>
         // Save basket with TTL
         var updatedBasket = await _basketRedisService.SaveBasketAsync(basket, _basketExpiry, cancellationToken);
 
-        _integrationEventCollector.AddIntegrationEvent(new UpdatedBasketItemIntegrationEvent(updatedBasket.Id, updatedBasket.UserId, updatedBasket.Items, updatedBasket.ExpirationTime, updatedBasket.IsDeleted));
+        _integrationEventCollector.AddIntegrationEvent(new UpdatedBasketItemsIntegrationEvent(updatedBasket.Id, updatedBasket.UserId, updatedBasket?.Items?.Adapt<ICollection<BasketItemsIntegrationEvent>>() , updatedBasket.ExpirationTime, updatedBasket.IsDeleted));
 
         return _mapper.Map<BasketDto>(updatedBasket);
     }
