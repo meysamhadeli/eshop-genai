@@ -6,14 +6,14 @@ using BuildingBlocks.Exception;
 using BuildingBlocks.Jwt;
 using BuildingBlocks.Mapster;
 using BuildingBlocks.MassTransit;
+using BuildingBlocks.Mongo;
 using BuildingBlocks.OpenApi;
-using BuildingBlocks.PersistMessageProcessor;
 using BuildingBlocks.ProblemDetails;
 using BuildingBlocks.Web;
 using Catalog.Data;
+using Catalog.Data.Seed;
 using Catalog.GrpcServer.Services;
 using Figgle;
-using Flight.Data.Seed;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 
@@ -52,11 +52,11 @@ public static class InfrastructureExtensions
         builder.Services.AddJwt();
 
         builder.AddCustomDbContext<CatalogDbContext>(nameof(Catalog));
-        builder.AddPersistMessageProcessor(nameof(PersistMessage));
         builder.Services.AddScoped<IEventDispatcher, EventDispatcher>();
         builder.Services.AddScoped<IIntegrationEventCollector, IntegrationEventCollector>();
         builder.Services.AddScoped<IDataSeeder, CatalogDataSeeder>();
         builder.Services.AddScoped<ICurrentUserProvider, CurrentUserProvider>();
+        builder.AddMongoDbContext<CatalogReadDbContext>();
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddAspnetOpenApi();
         builder.Services.AddCustomVersioning();

@@ -1,4 +1,5 @@
 using Catalog.Products.Features;
+using Catalog.Products.Features.GetproductById;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using MediatR;

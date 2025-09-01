@@ -1,8 +1,6 @@
-using System;
-using System.Collections.Generic;
 using Catalog.Products.Models;
 
-namespace Flight.Data.Seed;
+namespace Catalog.Data.Seed;
 
 public static class InitialData
 {

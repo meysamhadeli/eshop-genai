@@ -20,6 +20,14 @@ public static class Extensions
     )
     {
         services.AddValidateOptions<RabbitMqOptions>();
+        services.AddValidateOptions<PostgresOutboxOptions>();
+
+        if (transportType != TransportType.InMemory)
+        {
+            var serviceProvider = services.BuildServiceProvider();
+            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+            services.AddMassTransitOutboxDbContext(configuration);
+        }
 
         if (env.IsEnvironment("test"))
         {
@@ -49,9 +57,28 @@ public static class Extensions
     )
     {
         configure.AddConsumers(assembly);
-        configure.AddSagaStateMachines(assembly);
-        configure.AddSagas(assembly);
-        configure.AddActivities(assembly);
+
+        if (transportType != TransportType.InMemory)
+        {
+            var outboxOptions = services.GetOptions<PostgresOutboxOptions>(nameof(PostgresOutboxOptions));
+
+            configure.AddEntityFrameworkOutbox<OutboxDbContext>(outboxConfig =>
+            {
+                outboxConfig.UsePostgres();
+
+                outboxConfig.QueryDelay = outboxOptions.QueryDelay ?? TimeSpan.FromSeconds(30);
+                outboxConfig.QueryTimeout = outboxOptions.QueryTimeout ?? TimeSpan.FromSeconds(60);
+                outboxConfig.QueryMessageLimit = outboxOptions.QueryMessageLimit ?? 100;
+                outboxConfig.DuplicateDetectionWindow = outboxOptions.DuplicateDetectionWindow ?? TimeSpan.FromSeconds(30);
+
+                outboxConfig.UseBusOutbox(busOutboxConfig =>
+               {
+                   busOutboxConfig.MessageDeliveryLimit = outboxOptions.MessageDeliveryLimit ?? 10;
+               });
+            });
+
+            configure.AddConfigureEndpointsCallback((context, name, cfg) => cfg.UseEntityFrameworkOutbox<OutboxDbContext>(context));
+        }
 
         switch (transportType)
         {

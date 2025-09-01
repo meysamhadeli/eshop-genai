@@ -6,9 +6,10 @@ using Catalog.Products.Dtos;
 using Catalog.Products.Models;
 using MapsterMapper;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
+using MongoDB.Driver.Linq;
 
-namespace Catalog.Products.Features;
+namespace Catalog.Products.Features.GetProducts;
 
 public record GetProducts(
     int PageNumber = 1,
@@ -18,17 +19,17 @@ public record GetProducts(
 
 public class GetProductsHandler : IRequestHandler<GetProducts, PageList<ProductDto>>
 {
-    private readonly CatalogDbContext _context;
     private readonly IMapper _mapper;
+    private readonly CatalogReadDbContext _catalogReadDbContext;
     private readonly ISemanticSearchService _semanticSearchService;
 
     public GetProductsHandler(
-        CatalogDbContext context,
         IMapper mapper,
+        CatalogReadDbContext catalogReadDbContext,
         ISemanticSearchService semanticSearchService)
     {
-        _context = context;
         _mapper = mapper;
+        _catalogReadDbContext = catalogReadDbContext;
         _semanticSearchService = semanticSearchService;
     }
 
@@ -47,7 +48,7 @@ public class GetProductsHandler : IRequestHandler<GetProducts, PageList<ProductD
             {
                 var productIds = semanticResults.Select(p => p.Id).ToList();
 
-                var products = await _context.Products
+                var products = await _catalogReadDbContext.Product.AsQueryable()
                     .Where(p => productIds.Contains(p.Id))
                     .ToListAsync(cancellationToken);
 
@@ -74,7 +75,7 @@ public class GetProductsHandler : IRequestHandler<GetProducts, PageList<ProductD
         GetProducts request,
         CancellationToken cancellationToken)
     {
-        var query = _context.Products.AsQueryable();
+        var query = _catalogReadDbContext.Product.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {

@@ -10,7 +10,7 @@ public static class TestContainers
 {
     public static RabbitMqContainerOptions RabbitMqContainerConfiguration { get; }
     public static PostgresContainerOptions PostgresContainerConfiguration { get; }
-    public static PostgresPersistContainerOptions PostgresPersistContainerConfiguration { get; }
+    public static PostgresOtboxContainerOptions PostgresOutboxContainerConfiguration { get; }
     public static MongoContainerOptions MongoContainerConfiguration { get; }
     public static EventStoreContainerOptions EventStoreContainerConfiguration { get; }
 
@@ -22,8 +22,8 @@ public static class TestContainers
             configuration.GetOptions<RabbitMqContainerOptions>(nameof(RabbitMqContainerOptions));
         PostgresContainerConfiguration =
             configuration.GetOptions<PostgresContainerOptions>(nameof(PostgresContainerOptions));
-        PostgresPersistContainerConfiguration =
-            configuration.GetOptions<PostgresPersistContainerOptions>(nameof(PostgresPersistContainerOptions));
+        PostgresOutboxContainerConfiguration =
+            configuration.GetOptions<PostgresOtboxContainerOptions>(nameof(PostgresOtboxContainerOptions));
         MongoContainerConfiguration = configuration.GetOptions<MongoContainerOptions>(nameof(MongoContainerOptions));
         EventStoreContainerConfiguration =
             configuration.GetOptions<EventStoreContainerOptions>(nameof(EventStoreContainerOptions));
@@ -46,18 +46,18 @@ public static class TestContainers
         return builder;
     }
 
-    public static PostgreSqlContainer PostgresPersistTestContainer()
+    public static PostgreSqlContainer PostgresOutboxTestContainer()
     {
         var baseBuilder = new PostgreSqlBuilder()
-            .WithUsername(PostgresPersistContainerConfiguration.UserName)
-            .WithPassword(PostgresPersistContainerConfiguration.Password)
+            .WithUsername(PostgresOutboxContainerConfiguration.UserName)
+            .WithPassword(PostgresOutboxContainerConfiguration.Password)
             .WithLabel("Key", "Value");
 
         var builder = baseBuilder
-            .WithImage(PostgresPersistContainerConfiguration.ImageName)
-            .WithName(PostgresPersistContainerConfiguration.Name)
+            .WithImage(PostgresOutboxContainerConfiguration.ImageName)
+            .WithName(PostgresOutboxContainerConfiguration.Name)
             .WithCommand(new string[2] { "-c", "max_prepared_transactions=10" })
-            .WithPortBinding(PostgresPersistContainerConfiguration.Port, true)
+            .WithPortBinding(PostgresOutboxContainerConfiguration.Port, true)
             .Build();
 
         return builder;
@@ -128,7 +128,7 @@ public static class TestContainers
         public string Password { get; set; } = Guid.NewGuid().ToString("D");
     }
 
-    public sealed class PostgresPersistContainerOptions
+    public sealed class PostgresOtboxContainerOptions
     {
         public string Name { get; set; } = "postgreSql_" + Guid.NewGuid().ToString("D");
         public int Port { get; set; } = 5432;
