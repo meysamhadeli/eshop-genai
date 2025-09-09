@@ -1,6 +1,6 @@
 using System.Linq.Expressions;
 using System.Text.Json;
-using BuildingBlocks.AI.SemanticSearch;
+using BuildingBlocks.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel.Embeddings;
@@ -11,6 +11,7 @@ namespace BuildingBlocks.SemanticSearch;
 
 public interface ISemanticSearchService
 {
+    // Core search functionality
     Task<IEnumerable<TResult>> SemanticSearchAsync<T, TResult>(
         string query,
         Expression<Func<T, bool>>? filter = null,
@@ -20,26 +21,39 @@ public interface ISemanticSearchService
     where T : class
     where TResult : class;
 
+    // Vector-based search (for recommendations)
+    Task<IEnumerable<T>> SearchVectorsAsync<T>(
+        float[] vector, 
+        int maxResults = 10,
+        double similarityThreshold = 0.7,
+        CancellationToken cancellationToken = default) where T : class;
+
+    // CRUD operations
     Task IndexAsync<T>(T entity, CancellationToken cancellationToken = default) where T : class;
     Task UpdateAsync<T>(T entity, CancellationToken cancellationToken = default) where T : class;
     Task DeleteAsync<T>(object id, CancellationToken cancellationToken = default) where T : class;
+    
+    // Vector operations
+    Task<float[]?> GetVectorAsync<T>(object id, CancellationToken cancellationToken = default) where T : class;
 
+    // Collection management
     Task EnsureCollectionExists<T>(CancellationToken cancellationToken = default) where T : class;
     Task<bool> CollectionExistsAsync<T>(CancellationToken cancellationToken = default) where T : class;
     Task DeleteCollectionAsync<T>(CancellationToken cancellationToken = default) where T : class;
     Task<List<string>> ListCollectionsAsync(CancellationToken cancellationToken = default);
 }
 
+
 public class SemanticSearchService : ISemanticSearchService
 {
-    private readonly SemanticSearchOptions _options;
+    private readonly AIOptions _options;
     private readonly QdrantClient _qdrantClient;
     private readonly ITextEmbeddingGenerationService _embeddingService;
     private readonly ILogger<SemanticSearchService> _logger;
     private readonly bool _isEnabled;
 
     public SemanticSearchService(
-        IOptions<SemanticSearchOptions> options,
+        IOptions<AIOptions> options,
         QdrantClient qdrantClient,
         ITextEmbeddingGenerationService embeddingService,
         ILogger<SemanticSearchService> logger)
@@ -48,7 +62,7 @@ public class SemanticSearchService : ISemanticSearchService
         _qdrantClient = qdrantClient;
         _embeddingService = embeddingService;
         _logger = logger;
-        _isEnabled = _options.Enabled;
+        _isEnabled = _options.SemanticSearchEnabled;
 
         if (_isEnabled)
         {
@@ -74,52 +88,60 @@ public class SemanticSearchService : ISemanticSearchService
         try
         {
             var collectionName = GetCollectionName<T>();
-
-            // Check if collection exists before searching
-            var collectionExists = await _qdrantClient.CollectionExistsAsync(collectionName, cancellationToken);
-            if (!collectionExists)
+            if (!await CollectionExistsAsync<T>(cancellationToken))
             {
-                _logger.LogWarning("Collection {CollectionName} does not exist, returning empty results", collectionName);
+                _logger.LogWarning("Collection {CollectionName} does not exist", collectionName);
                 return Enumerable.Empty<TResult>();
             }
 
             var queryEmbedding = await _embeddingService.GenerateEmbeddingAsync(query, cancellationToken: cancellationToken);
-
+            
             var searchResult = await _qdrantClient.SearchAsync(
                 collectionName: collectionName,
                 vector: queryEmbedding.ToArray(),
-                limit: (ulong?)_options?.MaxResults ?? (ulong)maxResults,
-                scoreThreshold: (float?)_options?.SimilarityThreshold ?? (float?)similarityThreshold,
+                limit: (ulong)maxResults,
+                scoreThreshold: (float)similarityThreshold,
                 cancellationToken: cancellationToken);
 
-            var entities = new List<TResult>();
-
-            foreach (var point in searchResult)
-            {
-                try
-                {
-                    if (point.Payload.TryGetValue("entity", out var entityJson))
-                    {
-                        var entity = JsonSerializer.Deserialize<TResult>(entityJson.StringValue);
-                        if (entity != null)
-                        {
-                            entities.Add(entity);
-                        }
-                    }
-                }
-                catch (JsonException ex)
-                {
-                    _logger.LogWarning(ex, "Failed to deserialize entity from vector store");
-                }
-            }
-
-            _logger.LogInformation("Semantic search found {Count} entities for query: {Query}", entities.Count, query);
-            return entities;
+            return ExtractEntities<TResult>(searchResult);
         }
         catch (System.Exception ex)
         {
             _logger.LogError(ex, "Failed to perform semantic search for query: {Query}", query);
             return Enumerable.Empty<TResult>();
+        }
+    }
+
+    public async Task<IEnumerable<T>> SearchVectorsAsync<T>(
+        float[] vector, 
+        int maxResults = 10,
+        double similarityThreshold = 0.7,
+        CancellationToken cancellationToken = default) where T : class
+    {
+        if (!_isEnabled) return Enumerable.Empty<T>();
+
+        try
+        {
+            var collectionName = GetCollectionName<T>();
+            if (!await CollectionExistsAsync<T>(cancellationToken))
+            {
+                _logger.LogWarning("Collection {CollectionName} does not exist", collectionName);
+                return Enumerable.Empty<T>();
+            }
+
+            var searchResult = await _qdrantClient.SearchAsync(
+                collectionName: collectionName,
+                vector: vector,
+                limit: (ulong)maxResults,
+                scoreThreshold: (float)similarityThreshold,
+                cancellationToken: cancellationToken);
+
+            return ExtractEntities<T>(searchResult);
+        }
+        catch (System.Exception ex)
+        {
+            _logger.LogError(ex, "Failed to perform vector search");
+            return Enumerable.Empty<T>();
         }
     }
 
@@ -129,31 +151,29 @@ public class SemanticSearchService : ISemanticSearchService
 
         try
         {
-            // Ensure collection exists before indexing
+            var id = GetEntityId(entity);
             await EnsureCollectionExists<T>(cancellationToken);
-
             var collectionName = GetCollectionName<T>();
-            var entityId = GetEntityId(entity);
             var text = GenerateSearchText(entity);
 
             var embedding = await _embeddingService.GenerateEmbeddingAsync(text, cancellationToken: cancellationToken);
-
+            
             var point = new PointStruct
-            {
-                Id = new PointId { Uuid = entityId },
-                Vectors = embedding.ToArray(),
-                Payload =
-                {
-                    ["text"] = text,
-                    ["entity"] = JsonSerializer.Serialize(entity),
-                    ["type"] = typeof(T).Name,
-                    ["timestamp"] = DateTime.UtcNow.ToString("O")
-                }
-            };
+                        {
+                            Id = new PointId { Uuid = id },
+                            Vectors = embedding.ToArray(),
+                            Payload =
+                            {
+                                ["text"] = text,
+                                ["entity"] = JsonSerializer.Serialize(entity),
+                                ["type"] = typeof(T).Name,
+                                ["timestamp"] = DateTime.UtcNow.ToString("O")
+                            }
+                        };
 
             await _qdrantClient.UpsertAsync(collectionName, new[] { point }, cancellationToken: cancellationToken);
-
-            _logger.LogDebug("Entity {EntityId} indexed successfully in collection {Collection}", entityId, collectionName);
+            
+            _logger.LogDebug("Auto-indexed entity {EntityId} in collection {CollectionName}", id, collectionName);
         }
         catch (System.Exception ex)
         {
@@ -167,10 +187,11 @@ public class SemanticSearchService : ISemanticSearchService
 
         try
         {
-            var entityId = GetEntityId(entity);
-            await DeleteAsync<T>(entityId, cancellationToken);
+            var id = GetEntityId(entity);
+            await DeleteAsync<T>(id, cancellationToken);
             await IndexAsync(entity, cancellationToken);
-            _logger.LogDebug("Entity {EntityId} updated in vector store", entityId);
+            
+            _logger.LogDebug("Updated entity {EntityId} in vector store", id);
         }
         catch (System.Exception ex)
         {
@@ -190,11 +211,35 @@ public class SemanticSearchService : ISemanticSearchService
                 id: new PointId { Uuid = id.ToString() },
                 cancellationToken: cancellationToken);
 
-            _logger.LogDebug("Entity {EntityId} deleted from collection {Collection}", id, collectionName);
+            _logger.LogDebug("Deleted entity {EntityId} from collection {CollectionName}", id, collectionName);
         }
         catch (System.Exception ex)
         {
-            _logger.LogError(ex, "Failed to delete entity {EntityId} from collection", id);
+            _logger.LogError(ex, "Failed to delete entity {EntityId}", id);
+        }
+    }
+
+    public async Task<float[]?> GetVectorAsync<T>(object id, CancellationToken cancellationToken = default) where T : class
+    {
+        if (!_isEnabled) return null;
+
+        try
+        {
+            var collectionName = GetCollectionName<T>();
+            var results = await _qdrantClient.RetrieveAsync(
+                collectionName: collectionName,
+                ids: new[] { new PointId { Uuid = id.ToString() } },
+                withVectors: true,
+                cancellationToken: cancellationToken
+            );
+
+            var point = results.FirstOrDefault();
+            return point != null ? ExtractVectorFromPoint(point) : null;
+        }
+        catch (System.Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get vector for entity {EntityId}", id);
+            return null;
         }
     }
 
@@ -255,11 +300,74 @@ public class SemanticSearchService : ISemanticSearchService
         return collections.ToList();
     }
 
+    private IEnumerable<T> ExtractEntities<T>(IEnumerable<ScoredPoint> points) where T : class
+    {
+        return points
+            .Select(point =>
+                    {
+                        try
+                        {
+                            if (point.Payload.TryGetValue("entity", out var entityJson))
+                            {
+                                return JsonSerializer.Deserialize<T>(entityJson.StringValue);
+                            }
+                        }
+                        catch (JsonException ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to deserialize entity from vector store");
+                        }
+                        return null;
+                    })
+            .Where(entity => entity != null)
+            .Select(entity => entity!);
+    }
+
+    private float[]? ExtractVectorFromPoint(RetrievedPoint point)
+    {
+        if (point.Vectors == null) 
+        {
+            _logger.LogWarning("Point has no vectors");
+            return null;
+        }
+
+        try
+        {
+            var vectorsProperty = point.Vectors.GetType().GetProperty("Vectors");
+            if (vectorsProperty != null)
+            {
+                var vectorsValue = vectorsProperty.GetValue(point.Vectors);
+                if (vectorsValue is System.Collections.IDictionary vectorsDict && vectorsDict.Count > 0)
+                {
+                    foreach (System.Collections.DictionaryEntry entry in vectorsDict)
+                    {
+                        var vectorObj = entry.Value;
+                        var vectorProp = vectorObj?.GetType().GetProperty("Vector");
+                        if (vectorProp != null)
+                        {
+                            var vectorData = vectorProp.GetValue(vectorObj);
+                            if (vectorData is Google.Protobuf.Collections.RepeatedField<float> repeatedField)
+                            {
+                                return repeatedField.ToArray();
+                            }
+                        }
+                    }
+                }
+            }
+
+            _logger.LogWarning("Could not extract vector from RetrievedPoint structure");
+            return null;
+        }
+        catch (System.Exception ex)
+        {
+            _logger.LogError(ex, "Failed to extract vector using reflection");
+            return null;
+        }
+    }
+
     private string GetCollectionName<T>() where T : class
     {
         var typeName = typeof(T).Name.ToLowerInvariant();
-
-        // Remove common suffixes
+        
         var suffixesToRemove = new[] { "dto", "model", "entity", "record", "viewmodel" };
         foreach (var suffix in suffixesToRemove)
         {
@@ -275,7 +383,6 @@ public class SemanticSearchService : ISemanticSearchService
 
     private string GetEntityId<T>(T entity) where T : class
     {
-        // Try to get ID property using reflection
         var idProperty = typeof(T).GetProperties()
             .FirstOrDefault(p => p.Name.Equals("Id", StringComparison.OrdinalIgnoreCase) ||
                                 p.Name.Equals(typeof(T).Name + "Id", StringComparison.OrdinalIgnoreCase));
@@ -285,7 +392,6 @@ public class SemanticSearchService : ISemanticSearchService
 
     private string GenerateSearchText<T>(T entity) where T : class
     {
-        // Create searchable text from entity properties
         var properties = typeof(T).GetProperties()
             .Where(p => p.PropertyType == typeof(string) &&
                        !p.Name.Equals("Id", StringComparison.OrdinalIgnoreCase))

@@ -1,9 +1,8 @@
 using BuildingBlocks.Contracts.EventBus.Messages;
 using Catalog.Products.Models;
 using Mapster;
-using MassTransit;
 
-namespace Flight.Flights.Features;
+namespace Catalog.Products.Features;
 
 public class ProductMappings : IRegister
 {

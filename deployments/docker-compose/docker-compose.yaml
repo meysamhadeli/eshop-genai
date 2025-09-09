@@ -103,6 +103,14 @@ services:
       - ollama_data:/root/.ollama
     networks:
       - eshop
+    command: >
+      sh -c "
+        ollama serve &
+        sleep 5 &&
+        ollama pull qwen3:0.6b &&
+        ollama pull nomic-embed-text &&
+        wait
+      "
 
   # #######################################################
   # #  Qdrant
@@ -294,6 +302,7 @@ services:
     image: grafana/loki:latest
     hostname: loki
     container_name: loki
+    restart: unless-stopped
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
