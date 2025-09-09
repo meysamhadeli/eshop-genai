@@ -59,8 +59,8 @@ public class RecommendationService : IRecommendationService
             };
 
             await _semanticSearchService.IndexAsync(activityEntity, cancellationToken);
-            
-            _logger.LogDebug("Tracked user activity: {UserId} {ActivityType} {ItemId}", 
+
+            _logger.LogDebug("Tracked user activity: {UserId} {ActivityType} {ItemId}",
                 activity.UserId, activity.ActivityType, activity.ItemId);
         }
         catch (System.Exception ex)
@@ -74,7 +74,7 @@ public class RecommendationService : IRecommendationService
         int maxResults = 5,
         CancellationToken cancellationToken = default) where T : class
     {
-        if (!_isEnabled) 
+        if (!_isEnabled)
         {
             _logger.LogDebug("Recommendation service is disabled, returning empty results");
             return Enumerable.Empty<T>();
@@ -95,23 +95,23 @@ public class RecommendationService : IRecommendationService
         try
         {
             _logger.LogDebug("Getting recommendations for user {UserId}", userId);
-            
+
             var recentActivity = await GetMostRelevantActivity(userId, activityPriority, cancellationToken);
             if (recentActivity == null)
             {
                 _logger.LogDebug("No relevant activities found for user {UserId}", userId);
                 return Enumerable.Empty<T>();
             }
-        
+
             var itemVector = await _semanticSearchService.GetVectorAsync<T>(recentActivity.ItemId, cancellationToken);
             if (itemVector == null)
             {
                 _logger.LogWarning("Item vector not found for {ItemId}", recentActivity.ItemId);
                 return Enumerable.Empty<T>();
             }
-        
+
             var boostedVector = ApplyWeightToVector(itemVector, GetActivityWeight(recentActivity.ActivityType));
-        
+
             var recommendations = await _semanticSearchService.SearchVectorsAsync<T>(
                 boostedVector,
                 maxResults,
@@ -130,7 +130,7 @@ public class RecommendationService : IRecommendationService
     }
 
     private async Task<UserActivity?> GetMostRelevantActivity(
-        string userId, 
+        string userId,
         string[] activityTypes,
         CancellationToken cancellationToken = default)
     {
@@ -155,7 +155,7 @@ public class RecommendationService : IRecommendationService
 
             if (relevantActivity != null)
             {
-                _logger.LogDebug("Found relevant activity: {ActivityType} for {ItemId}", 
+                _logger.LogDebug("Found relevant activity: {ActivityType} for {ItemId}",
                     relevantActivity.ActivityType, relevantActivity.ItemId);
             }
 

@@ -73,9 +73,9 @@ public static class InfrastructureExtensions
                                  });
 
         builder.Services.AddCustomHybridCaching();
-        
-        builder.Services.AddSemanticKernel()          
-            .AddSemanticSearch()            
+
+        builder.Services.AddSemanticKernel()
+            .AddSemanticSearch()
             .AddRecommendationService();
 
         return builder;

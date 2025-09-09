@@ -23,7 +23,7 @@ public interface ISemanticSearchService
 
     // Vector-based search (for recommendations)
     Task<IEnumerable<T>> SearchVectorsAsync<T>(
-        float[] vector, 
+        float[] vector,
         int maxResults = 10,
         double similarityThreshold = 0.7,
         CancellationToken cancellationToken = default) where T : class;
@@ -32,7 +32,7 @@ public interface ISemanticSearchService
     Task IndexAsync<T>(T entity, CancellationToken cancellationToken = default) where T : class;
     Task UpdateAsync<T>(T entity, CancellationToken cancellationToken = default) where T : class;
     Task DeleteAsync<T>(object id, CancellationToken cancellationToken = default) where T : class;
-    
+
     // Vector operations
     Task<float[]?> GetVectorAsync<T>(object id, CancellationToken cancellationToken = default) where T : class;
 
@@ -95,7 +95,7 @@ public class SemanticSearchService : ISemanticSearchService
             }
 
             var queryEmbedding = await _embeddingService.GenerateEmbeddingAsync(query, cancellationToken: cancellationToken);
-            
+
             var searchResult = await _qdrantClient.SearchAsync(
                 collectionName: collectionName,
                 vector: queryEmbedding.ToArray(),
@@ -113,7 +113,7 @@ public class SemanticSearchService : ISemanticSearchService
     }
 
     public async Task<IEnumerable<T>> SearchVectorsAsync<T>(
-        float[] vector, 
+        float[] vector,
         int maxResults = 10,
         double similarityThreshold = 0.7,
         CancellationToken cancellationToken = default) where T : class
@@ -157,22 +157,22 @@ public class SemanticSearchService : ISemanticSearchService
             var text = GenerateSearchText(entity);
 
             var embedding = await _embeddingService.GenerateEmbeddingAsync(text, cancellationToken: cancellationToken);
-            
+
             var point = new PointStruct
-                        {
-                            Id = new PointId { Uuid = id },
-                            Vectors = embedding.ToArray(),
-                            Payload =
+            {
+                Id = new PointId { Uuid = id },
+                Vectors = embedding.ToArray(),
+                Payload =
                             {
                                 ["text"] = text,
                                 ["entity"] = JsonSerializer.Serialize(entity),
                                 ["type"] = typeof(T).Name,
                                 ["timestamp"] = DateTime.UtcNow.ToString("O")
                             }
-                        };
+            };
 
             await _qdrantClient.UpsertAsync(collectionName, new[] { point }, cancellationToken: cancellationToken);
-            
+
             _logger.LogDebug("Auto-indexed entity {EntityId} in collection {CollectionName}", id, collectionName);
         }
         catch (System.Exception ex)
@@ -190,7 +190,7 @@ public class SemanticSearchService : ISemanticSearchService
             var id = GetEntityId(entity);
             await DeleteAsync<T>(id, cancellationToken);
             await IndexAsync(entity, cancellationToken);
-            
+
             _logger.LogDebug("Updated entity {EntityId} in vector store", id);
         }
         catch (System.Exception ex)
@@ -324,7 +324,7 @@ public class SemanticSearchService : ISemanticSearchService
 
     private float[]? ExtractVectorFromPoint(RetrievedPoint point)
     {
-        if (point.Vectors == null) 
+        if (point.Vectors == null)
         {
             _logger.LogWarning("Point has no vectors");
             return null;
@@ -367,7 +367,7 @@ public class SemanticSearchService : ISemanticSearchService
     private string GetCollectionName<T>() where T : class
     {
         var typeName = typeof(T).Name.ToLowerInvariant();
-        
+
         var suffixesToRemove = new[] { "dto", "model", "entity", "record", "viewmodel" };
         foreach (var suffix in suffixesToRemove)
         {

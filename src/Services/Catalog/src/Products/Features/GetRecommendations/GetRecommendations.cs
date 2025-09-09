@@ -26,16 +26,16 @@ public class GetRecommendationsByActivityTypeHandler : IRequestHandler<GetRecomm
 
     public async Task<PageList<ProductDto>> Handle(GetRecommendations request, CancellationToken cancellationToken)
     {
-            var recommendations = await _recommendationService.GetRecommendationsAsync<ProductDto>(
-                request.UserId,
-                request.PageSize,
-                cancellationToken);
+        var recommendations = await _recommendationService.GetRecommendationsAsync<ProductDto>(
+            request.UserId,
+            request.PageSize,
+            cancellationToken);
 
-            return new PageList<ProductDto>(
-                recommendations.ToList(),
-                recommendations.Count(),
-                request.PageNumber,
-                request.PageSize);
+        return new PageList<ProductDto>(
+            recommendations.ToList(),
+            recommendations.Count(),
+            request.PageNumber,
+            request.PageSize);
     }
 }
 
@@ -49,7 +49,7 @@ public class GetRecommendationsEndpoints : IMinimalEndpoint
             IMediator mediator,
             CancellationToken cancellationToken) =>
         {
-            var result = await mediator.Send(new GetRecommendations(userId, query.PageNumber, query.PageSize) , cancellationToken);
+            var result = await mediator.Send(new GetRecommendations(userId, query.PageNumber, query.PageSize), cancellationToken);
             return Results.Ok(result);
         })
         .WithName("GetRecommendations")

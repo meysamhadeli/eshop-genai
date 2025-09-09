@@ -218,7 +218,7 @@ if (builder.ExecutionContext.IsPublishMode)
 
 var ollama = builder.AddOllama("ollama")
     .WithEndpoint(port: 11434, targetPort: 11434, name: "http", isProxied: true, isExternal: false)
-    .WithGPUSupport() 
+    .WithGPUSupport()
     .WithDataVolume("ollama-data")
     .WithLifetime(ContainerLifetime.Persistent)
     .AddModel("nomic-embed-text");

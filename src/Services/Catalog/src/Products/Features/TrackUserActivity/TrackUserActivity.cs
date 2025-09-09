@@ -27,18 +27,18 @@ public class TrackUserActivityHandler : IRequestHandler<TrackUserActivity>
 
     public async Task Handle(TrackUserActivity request, CancellationToken cancellationToken)
     {
-            var userActivity = new UserActivity
-            {
-                UserId = request.UserId,
-                ItemId = request.ItemId,
-                ActivityType = request.ActivityType,
-                Metadata = request.Metadata ?? new Dictionary<string, object>(),
-                Context = request.Context
-            };
+        var userActivity = new UserActivity
+        {
+            UserId = request.UserId,
+            ItemId = request.ItemId,
+            ActivityType = request.ActivityType,
+            Metadata = request.Metadata ?? new Dictionary<string, object>(),
+            Context = request.Context
+        };
 
-            await _recommendationService.TrackUserActivityAsync(userActivity, cancellationToken);
-            
-            _logger.LogInformation("Tracked {ActivityType} activity for user {UserId} on item {ItemId}", request.ActivityType, request.UserId, request.ItemId);
+        await _recommendationService.TrackUserActivityAsync(userActivity, cancellationToken);
+
+        _logger.LogInformation("Tracked {ActivityType} activity for user {UserId} on item {ItemId}", request.ActivityType, request.UserId, request.ItemId);
     }
 }
 
