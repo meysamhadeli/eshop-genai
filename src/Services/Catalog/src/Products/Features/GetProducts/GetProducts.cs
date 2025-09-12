@@ -50,7 +50,7 @@ public class GetProductsHandler : IRequestHandler<GetProducts, PageList<ProductD
                 var productDtos = _mapper.Map<IReadOnlyList<ProductDto>>(semanticResults.Results);
 
                 return PageList<ProductDto>.Create(
-                    productDtos, 
+                    productDtos,
                     request.PageNumber,
                     request.PageSize,
                     semanticResults.TotalCounts,

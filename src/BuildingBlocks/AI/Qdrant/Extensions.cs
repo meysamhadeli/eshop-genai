@@ -14,7 +14,7 @@ public static class Extensions
 
         services.AddSingleton<QdrantClient>(sp => new QdrantClient(new Uri(options.VectorDbConnectionString)));
         services.AddSingleton(typeof(IQdrantRepository<>), typeof(QdrantRepository<>));
-        
+
         return services;
     }
 }

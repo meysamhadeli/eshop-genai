@@ -77,7 +77,7 @@ public static class InfrastructureExtensions
         builder.Services.AddCustomHybridCaching();
 
         builder.Services.AddQdrant();
-        
+
         builder.Services.AddSemanticKernel()
             .AddSemanticSearch()
             .AddRecommendationService();

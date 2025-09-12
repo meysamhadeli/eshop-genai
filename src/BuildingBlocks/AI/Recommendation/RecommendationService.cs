@@ -10,7 +10,7 @@ namespace BuildingBlocks.AI.Recommendation;
 public interface IRecommendationService
 {
     Task TrackUserActivityAsync(UserActivity activity, CancellationToken cancellationToken = default);
-    
+
     Task<SearchResult<T>> GetRecommendationsAsync<T>(
         string userId,
         int maxResults = 5,

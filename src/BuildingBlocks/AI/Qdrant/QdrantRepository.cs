@@ -18,19 +18,19 @@ public interface IQdrantRepository<T> where T : class
     Task DeleteAsync(object id, CancellationToken cancellationToken = default);
     Task<T?> GetByIdAsync(object id, CancellationToken cancellationToken = default);
     Task<float[]?> GetVectorAsync(object id, CancellationToken cancellationToken = default);
-    
+
     Task<IEnumerable<ScoredPoint>> SearchAsync(
         float[] vector,
         int maxResults = 10,
         double similarityThreshold = 0.7,
         CancellationToken cancellationToken = default);
-    
+
     Task<IEnumerable<ScoredPoint>> SearchByTextAsync(
         string queryText,
         int maxResults = 10,
         double similarityThreshold = 0.7,
         CancellationToken cancellationToken = default);
-    
+
     Task<List<string>> ListCollectionsAsync(CancellationToken cancellationToken = default);
     public T? ExtractEntity(ScoredPoint point);
 }
@@ -93,7 +93,7 @@ public class QdrantRepository<T> : IQdrantRepository<T> where T : class
         _logger.LogInformation("Deleted collection {CollectionName}", _collectionName);
     }
 
-    
+
     public async Task IndexAsync(T entity, CancellationToken cancellationToken = default)
     {
         if (_embeddingService == null)
@@ -106,17 +106,17 @@ public class QdrantRepository<T> : IQdrantRepository<T> where T : class
         var id = GetEntityId(entity);
 
         var point = new PointStruct
-                    {
-                        Id = new PointId { Uuid = id },
-                        Vectors = vector.ToArray(),
-                        Payload =
+        {
+            Id = new PointId { Uuid = id },
+            Vectors = vector.ToArray(),
+            Payload =
                         {
                             ["text"] = text,
                             ["entity"] = JsonSerializer.Serialize(entity),
                             ["type"] = typeof(T).Name,
                             ["timestamp"] = DateTime.UtcNow.ToString("O")
                         }
-                    };
+        };
 
         await _qdrantClient.UpsertAsync(_collectionName, new[] { point }, cancellationToken: cancellationToken);
 
@@ -127,7 +127,7 @@ public class QdrantRepository<T> : IQdrantRepository<T> where T : class
     {
         await DeleteAsync(GetEntityId(entity), cancellationToken);
         await IndexAsync(entity, cancellationToken);
-        
+
         _logger.LogDebug("Updated entity {EntityId} by text in collection {CollectionName}", GetEntityId(entity), _collectionName);
     }
 
@@ -174,7 +174,7 @@ public class QdrantRepository<T> : IQdrantRepository<T> where T : class
         var point = results.FirstOrDefault();
         return point != null ? ExtractVectorFromPoint(point) : null;
     }
-    
+
     public async Task<IEnumerable<ScoredPoint>> SearchAsync(
         float[] vector,
         int maxResults = 10,
@@ -188,7 +188,7 @@ public class QdrantRepository<T> : IQdrantRepository<T> where T : class
                    scoreThreshold: (float)similarityThreshold,
                    cancellationToken: cancellationToken);
     }
-    
+
     public async Task<IEnumerable<ScoredPoint>> SearchByTextAsync(
         string queryText,
         int maxResults = 10,
@@ -207,7 +207,7 @@ public class QdrantRepository<T> : IQdrantRepository<T> where T : class
         var collections = await _qdrantClient.ListCollectionsAsync(cancellationToken);
         return collections.ToList();
     }
-    
+
     public T? ExtractEntity(ScoredPoint point)
     {
         try
