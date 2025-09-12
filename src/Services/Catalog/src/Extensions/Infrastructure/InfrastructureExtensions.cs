@@ -1,4 +1,7 @@
 using BuildingBlocks.AI;
+using BuildingBlocks.AI.Qdrant;
+using BuildingBlocks.AI.Recommendation;
+using BuildingBlocks.AI.SemanticKernel;
 using BuildingBlocks.AI.SemanticSearch;
 using BuildingBlocks.Caching;
 using BuildingBlocks.Core;
@@ -10,7 +13,6 @@ using BuildingBlocks.MassTransit;
 using BuildingBlocks.Mongo;
 using BuildingBlocks.OpenApi;
 using BuildingBlocks.ProblemDetails;
-using BuildingBlocks.Recommendation;
 using BuildingBlocks.Web;
 using Catalog.Data;
 using Catalog.Data.Seed;
@@ -74,6 +76,8 @@ public static class InfrastructureExtensions
 
         builder.Services.AddCustomHybridCaching();
 
+        builder.Services.AddQdrant();
+        
         builder.Services.AddSemanticKernel()
             .AddSemanticSearch()
             .AddRecommendationService();

@@ -12,7 +12,7 @@ public class AIOptions
     public int? EmbeddingDimensions { get; set; }
 
     // Chat/completion settings
-    public string ChatModel { get; set; } = "llama2";
+    public string ChatModel { get; set; } = "qwen3:0.6b";
     public string ChatBaseUrl { get; set; } = "http://localhost:11434";
 
     // Azure/OpenAI specific
@@ -22,10 +22,13 @@ public class AIOptions
 
     // Semantic search settings
     public bool SemanticSearchEnabled { get; set; } = true;
+    public bool SearchExplanationEnabled { get; set; }
     public int MaxResults { get; set; } = 10;
     public double SimilarityThreshold { get; set; } = 0.7;
     public int VectorSize { get; set; } = 768;
 
     // Recommendation settings
     public bool RecommendationEnabled { get; set; } = true;
+    public bool RecommendationExplanationEnabled { get; set; }
+
 }

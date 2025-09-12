@@ -1,5 +1,5 @@
+using BuildingBlocks.AI.Recommendation;
 using BuildingBlocks.AI.SemanticSearch;
-using BuildingBlocks.AI.SemanticSearch.Models;
 using BuildingBlocks.Web;
 using MediatR;
 

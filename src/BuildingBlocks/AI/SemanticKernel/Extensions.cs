@@ -5,7 +5,7 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Embeddings;
 
-namespace BuildingBlocks.AI;
+namespace BuildingBlocks.AI.SemanticKernel;
 
 public static class Extensions
 {

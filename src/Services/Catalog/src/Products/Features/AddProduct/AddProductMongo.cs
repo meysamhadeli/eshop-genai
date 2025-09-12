@@ -31,7 +31,7 @@ public class AddProductMongoHandler : IConsumer<ProductAddedIntegrationEvent>
         var productReadModel = _mapper.Map<ProductReadModel>(context.Message);
 
         var product = await _catalogReadDbContext.Product.AsQueryable()
-                         .FirstOrDefaultAsync(x => x.Id == productReadModel.Id && !x.IsDeleted, context.CancellationToken);
+                          .FirstOrDefaultAsync(x => x.Id == productReadModel.Id && !x.IsDeleted, context.CancellationToken);
 
         if (product is not null)
         {

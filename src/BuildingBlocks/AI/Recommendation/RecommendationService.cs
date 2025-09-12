@@ -1,40 +1,50 @@
-using BuildingBlocks.AI.SemanticSearch.Models;
-using BuildingBlocks.SemanticSearch;
+using System.Text.Json;
+using BuildingBlocks.AI.Qdrant;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.SemanticKernel.ChatCompletion;
 
-namespace BuildingBlocks.AI.SemanticSearch;
+namespace BuildingBlocks.AI.Recommendation;
 
 public interface IRecommendationService
 {
     Task TrackUserActivityAsync(UserActivity activity, CancellationToken cancellationToken = default);
-    Task<IEnumerable<T>> GetRecommendationsAsync<T>(
+    
+    Task<SearchResult<T>> GetRecommendationsAsync<T>(
         string userId,
         int maxResults = 5,
+        bool includeExplanation = false,
         CancellationToken cancellationToken = default
     ) where T : class;
 }
 
 public class RecommendationService : IRecommendationService
 {
-    private readonly ISemanticSearchService _semanticSearchService;
+    private readonly IQdrantRepository<UserActivity> _activityRepository;
+    private readonly IChatCompletionService _chatService;
     private readonly ILogger<RecommendationService> _logger;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly AIOptions _options;
     private readonly bool _isEnabled;
 
     public RecommendationService(
-        ISemanticSearchService semanticSearchService,
+        IQdrantRepository<UserActivity> activityRepository,
+        IChatCompletionService chatService,
         IOptions<AIOptions> options,
-        ILogger<RecommendationService> logger)
+        ILogger<RecommendationService> logger,
+        IServiceScopeFactory scopeFactory)
     {
-        _semanticSearchService = semanticSearchService;
+        _activityRepository = activityRepository;
+        _chatService = chatService;
         _logger = logger;
+        _scopeFactory = scopeFactory;
         _options = options.Value;
         _isEnabled = _options.RecommendationEnabled;
 
         if (_isEnabled)
         {
-            _logger.LogInformation("Recommendation service initialized");
+            _logger.LogInformation("Recommendation service initialized with direct Qdrant access");
         }
         else
         {
@@ -48,48 +58,43 @@ public class RecommendationService : IRecommendationService
 
         try
         {
-            var activityEntity = new
-            {
-                Id = $"{activity.UserId}_{activity.ItemId}_{activity.Timestamp.Ticks}",
-                activity.UserId,
-                activity.ItemId,
-                activity.ActivityType,
-                activity.Timestamp,
-                Weight = GetActivityWeight(activity.ActivityType)
-            };
+            activity.Id = $"{activity.UserId}_{activity.ItemId}_{activity.Timestamp.Ticks}";
+            activity.Weight = GetActivityWeight(activity.ActivityType);
 
-            await _semanticSearchService.IndexAsync(activityEntity, cancellationToken);
+            await _activityRepository.IndexAsync(activity, cancellationToken);
 
-            _logger.LogDebug("Tracked user activity: {UserId} {ActivityType} {ItemId}",
-                activity.UserId, activity.ActivityType, activity.ItemId);
+            _logger.LogDebug("Tracked user activity: {UserId} {ActivityType} {ItemId}", activity.UserId, activity.ActivityType, activity.ItemId);
         }
         catch (System.Exception ex)
         {
-            _logger.LogError(ex, "Failed to track user activity");
+            _logger.LogError(ex, "Failed to track user activity for user {UserId}", activity.UserId);
         }
     }
 
-    public async Task<IEnumerable<T>> GetRecommendationsAsync<T>(
+    public async Task<SearchResult<T>> GetRecommendationsAsync<T>(
         string userId,
         int maxResults = 5,
+        bool includeExplanation = false,
         CancellationToken cancellationToken = default) where T : class
     {
         if (!_isEnabled)
         {
-            _logger.LogDebug("Recommendation service is disabled, returning empty results");
-            return Enumerable.Empty<T>();
+            return new SearchResult<T>
+            {
+                Explanation = includeExplanation ? "Recommendation service is currently disabled." : null
+            };
         }
 
         var activityPriority = new[]
         {
-            ActivityTypes.Purchase,    // 3.0 weight - most valuable
-            ActivityTypes.AddToCart,   // 2.5 weight
-            ActivityTypes.Bookmark,    // 2.0 weight  
-            ActivityTypes.Like,        // 1.8 weight
-            ActivityTypes.Rating,      // 1.7 weight
-            ActivityTypes.Comment,     // 1.6 weight
-            ActivityTypes.Click,       // 1.3 weight
-            ActivityTypes.View         // 1.0 weight - least valuable
+            ActivityTypes.Purchase,
+            ActivityTypes.AddToCart,
+            ActivityTypes.Bookmark,
+            ActivityTypes.Like,
+            ActivityTypes.Rating,
+            ActivityTypes.Comment,
+            ActivityTypes.Click,
+            ActivityTypes.View
         };
 
         try
@@ -100,32 +105,70 @@ public class RecommendationService : IRecommendationService
             if (recentActivity == null)
             {
                 _logger.LogDebug("No relevant activities found for user {UserId}", userId);
-                return Enumerable.Empty<T>();
+                return new SearchResult<T>
+                {
+                    Explanation = includeExplanation
+                        ? "We couldn't find enough activity history to provide personalized recommendations. Try exploring more items!"
+                        : null
+                };
             }
 
-            var itemVector = await _semanticSearchService.GetVectorAsync<T>(recentActivity.ItemId, cancellationToken);
+            var itemRepository = GetItemRepository<T>();
+
+            var itemVector = await itemRepository.GetVectorAsync(recentActivity.ItemId, cancellationToken);
             if (itemVector == null)
             {
                 _logger.LogWarning("Item vector not found for {ItemId}", recentActivity.ItemId);
-                return Enumerable.Empty<T>();
+                return new SearchResult<T>
+                {
+                    Explanation = includeExplanation
+                        ? "We're having trouble finding recommendations based on your recent activity."
+                        : null
+                };
             }
 
             var boostedVector = ApplyWeightToVector(itemVector, GetActivityWeight(recentActivity.ActivityType));
 
-            var recommendations = await _semanticSearchService.SearchVectorsAsync<T>(
+            var scoredPoints = await itemRepository.SearchAsync(
                 boostedVector,
                 maxResults,
-                0.6f,
-                cancellationToken
-            );
+                0.6,
+                cancellationToken);
 
-            _logger.LogInformation("Found {Count} recommendations for user {UserId}", recommendations.Count(), userId);
-            return recommendations.ToList();
+            var averageSimilarity = scoredPoints.Any() ? scoredPoints.Average(p => p.Score) : 0.0;
+
+            var recommendations = scoredPoints
+                .Select(itemRepository.ExtractEntity)
+                .Where(e => e != null)
+                .Take(maxResults)
+                .ToList();
+
+            var explanation = includeExplanation || _options.RecommendationExplanationEnabled
+                ? await GenerateRecommendationExplanationAsync(userId, recommendations, recentActivity, cancellationToken)
+                : null;
+
+            _logger.LogInformation("Found {Count} recommendations for user {UserId}", recommendations.Count, userId);
+
+            return new SearchResult<T>
+            {
+                Results = recommendations,
+                Explanation = explanation,
+                OriginalQuery = $"Recommendations for user {userId} based on {recentActivity.ActivityType} activity",
+                HasExactMatches = recommendations.Any(),
+                TotalCounts = recommendations.Count,
+                AverageSimilarity = averageSimilarity, // ✅ Real score from Qdrant!
+                Timestamp = DateTime.UtcNow
+            };
         }
         catch (System.Exception ex)
         {
             _logger.LogError(ex, "Failed to get recommendations for user {UserId}", userId);
-            return Enumerable.Empty<T>();
+            return new SearchResult<T>
+            {
+                Explanation = includeExplanation
+                    ? "Sorry, we encountered an issue while generating your recommendations. Please try again later."
+                    : null
+            };
         }
     }
 
@@ -136,19 +179,18 @@ public class RecommendationService : IRecommendationService
     {
         try
         {
-            // Search for activities and filter in memory
-            var allActivities = await _semanticSearchService.SemanticSearchAsync<object, UserActivity>(
-                userId,
-                maxResults: 20, // Get more to filter down
-                cancellationToken: cancellationToken
-            );
+            var scoredPoints = await _activityRepository.SearchByTextAsync(
+                 userId,
+                20,
+                0.0, // Low threshold to cast wide net
+                cancellationToken);
 
-            // Filter in memory
-            var filteredActivities = allActivities
-                .Where(a => a.UserId == userId && activityTypes.Contains(a.ActivityType))
+            var activities = scoredPoints
+                .Select(_activityRepository.ExtractEntity)
+                .Where(a => a != null && a.UserId == userId && activityTypes.Contains(a.ActivityType))
                 .ToList();
 
-            var relevantActivity = filteredActivities
+            var relevantActivity = activities
                 .OrderByDescending(a => GetActivityWeight(a.ActivityType))
                 .ThenByDescending(a => a.Timestamp)
                 .FirstOrDefault();
@@ -164,6 +206,64 @@ public class RecommendationService : IRecommendationService
         catch (System.Exception ex)
         {
             _logger.LogWarning(ex, "Failed to get user activities for {UserId}", userId);
+            return null;
+        }
+    }
+
+    private async Task<string?> GenerateRecommendationExplanationAsync<T>(
+        string userId,
+        IEnumerable<T> recommendations,
+        UserActivity sourceActivity,
+        CancellationToken cancellationToken = default) where T : class
+    {
+        try
+        {
+            var chatHistory = new ChatHistory();
+
+            chatHistory.AddSystemMessage("""
+                You are a helpful recommendation assistant that explains why certain items are being recommended.
+                Your task is to provide a friendly, natural explanation for the recommendations.
+
+                Guidelines:
+                1. Explain the connection to the user's recent activity
+                2. Be concise but helpful (1-2 sentences)
+                3. Use natural, conversational language
+                4. Mention the type of activity that triggered the recommendations
+                5. Sound excited and encouraging
+                """);
+
+            var recommendationsJson = JsonSerializer.Serialize(
+                recommendations.Take(3),
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+
+            chatHistory.AddUserMessage($"""
+                Please provide a helpful explanation for these recommendations.
+
+                User ID: {userId}
+                Source Activity: {sourceActivity.ActivityType} on item {sourceActivity.ItemId}
+
+                Recommended Items (first 3):
+                {recommendationsJson}
+
+                Please provide a concise, friendly explanation that:
+                1. Mentions the user's recent activity
+                2. Explains why these items are being recommended
+                3. Is encouraging and positive
+                4. Keeps it brief (1-2 sentences)
+                """);
+
+            var response = await _chatService.GetChatMessageContentAsync(
+                chatHistory, cancellationToken: cancellationToken);
+
+            return response.Content;
+        }
+        catch (System.Exception ex)
+        {
+            _logger.LogError(ex, "Failed to generate recommendation explanation");
             return null;
         }
     }
@@ -187,5 +287,11 @@ public class RecommendationService : IRecommendationService
             ActivityTypes.View => 1.0,
             _ => 1.0
         };
+    }
+
+    private IQdrantRepository<T> GetItemRepository<T>() where T : class
+    {
+        using var scope = _scopeFactory.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<IQdrantRepository<T>>();
     }
 }

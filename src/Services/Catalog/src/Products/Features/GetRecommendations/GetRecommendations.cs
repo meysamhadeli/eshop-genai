@@ -1,3 +1,4 @@
+using BuildingBlocks.AI.Recommendation;
 using BuildingBlocks.AI.SemanticSearch;
 using BuildingBlocks.Core.Pagination;
 using BuildingBlocks.Web;
@@ -29,11 +30,11 @@ public class GetRecommendationsByActivityTypeHandler : IRequestHandler<GetRecomm
         var recommendations = await _recommendationService.GetRecommendationsAsync<ProductDto>(
             request.UserId,
             request.PageSize,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         return new PageList<ProductDto>(
-            recommendations.ToList(),
-            recommendations.Count(),
+            recommendations.Results.ToList(),
+            recommendations.TotalCounts,
             request.PageNumber,
             request.PageSize);
     }

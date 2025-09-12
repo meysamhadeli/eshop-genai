@@ -1,13 +1,12 @@
-using BuildingBlocks.AI.SemanticSearch;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace BuildingBlocks.Recommendation;
+namespace BuildingBlocks.AI.Recommendation;
 
 public static class Extensions
 {
     public static IServiceCollection AddRecommendationService(this IServiceCollection services)
     {
-        services.AddSingleton<IRecommendationService, RecommendationService>();
+        services.AddScoped<IRecommendationService, RecommendationService>();
         return services;
     }
 }

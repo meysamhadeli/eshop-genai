@@ -1,9 +1,12 @@
 using System.Text.Json.Serialization;
 
-namespace BuildingBlocks.AI.SemanticSearch.Models;
+namespace BuildingBlocks.AI.Recommendation;
 
 public class UserActivity
 {
+    [JsonPropertyName("id")]
+    public string Id { get; set; }
+
     [JsonPropertyName("userId")]
     public string UserId { get; set; } = string.Empty;
 
