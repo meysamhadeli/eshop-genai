@@ -70,7 +70,7 @@ public class RecommendationService : IRecommendationService
             await _activityRepository.EnsureCollectionExistsAsync(cancellationToken);
             await _activityRepository.IndexAsync(activity, cancellationToken);
 
-            _logger.LogDebug("Tracked user activity: {UserId} {ActivityType} {ItemId}", 
+            _logger.LogDebug("Tracked user activity: {UserId} {ActivityType} {ItemId}",
                 activity.UserId, activity.ActivityType, activity.ItemId);
         }
         catch (System.Exception ex)
@@ -114,7 +114,7 @@ public class RecommendationService : IRecommendationService
 
             var recommendations = await GetRecommendationsFromActivities<T>(
                 userActivities, targetRepository, maxResults, similarityThreshold, cancellationToken);
-            
+
             if (!recommendations.Any())
             {
                 _logger.LogDebug("No recommendations found for user {UserId}", userId);
@@ -155,9 +155,9 @@ public class RecommendationService : IRecommendationService
         try
         {
             _logger.LogDebug("Searching for activities for user {UserId}", userId);
-            
+
             var scoredPoints = await _activityRepository.SearchByTextAsync(
-                userId, 
+                userId,
                 50,
                 0.3,
                 cancellationToken);
@@ -169,13 +169,13 @@ public class RecommendationService : IRecommendationService
                 .ToList();
 
             _logger.LogDebug("Found {Count} activities for user {UserId}", activities.Count, userId);
-            
+
             foreach (var activity in activities)
             {
-                _logger.LogDebug("Activity: User={UserId}, Item={ItemId}, Type={ActivityType}", 
+                _logger.LogDebug("Activity: User={UserId}, Item={ItemId}, Type={ActivityType}",
                     activity.UserId, activity.ItemId, activity.ActivityType);
             }
-            
+
             return activities;
         }
         catch (System.Exception ex)
@@ -272,12 +272,12 @@ public class RecommendationService : IRecommendationService
         {
             // Generate meaningful text from the item properties
             var properties = typeof(T).GetProperties()
-                .Where(p => (p.PropertyType == typeof(string) || 
+                .Where(p => (p.PropertyType == typeof(string) ||
                              p.PropertyType == typeof(int) ||
                              p.PropertyType == typeof(decimal)) &&
                             p.CanRead &&
                             !p.Name.Equals("Id", StringComparison.OrdinalIgnoreCase))
-                .Select(p => 
+                .Select(p =>
                         {
                             var value = p.GetValue(item);
                             return value != null ? $"{p.Name.ToLower(CultureInfo.CurrentCulture)}:{value}" : null;
@@ -285,7 +285,7 @@ public class RecommendationService : IRecommendationService
                 .Where(v => !string.IsNullOrEmpty(v));
 
             var result = string.Join(" ", properties);
-        
+
             // Fallback to JSON if no meaningful text generated
             return !string.IsNullOrWhiteSpace(result) ? result : JsonSerializer.Serialize(item);
         }
@@ -313,9 +313,9 @@ public class RecommendationService : IRecommendationService
 
             // Get popular items
             var scoredPoints = await targetRepository.SearchByTextAsync(
-                "popular", 
-                maxResults, 
-                similarityThreshold, 
+                "popular",
+                maxResults,
+                similarityThreshold,
                 cancellationToken);
 
             var items = scoredPoints
@@ -343,12 +343,12 @@ public class RecommendationService : IRecommendationService
 
     private string GenerateActivitySearchText(UserActivity activity)
     {
-        var textParts = new List<string> 
+        var textParts = new List<string>
             {
-                $"user:{activity.UserId}", 
-                $"item:{activity.ItemId}", 
-                $"action:{activity.ActivityType}", 
-                $"weight:{activity.Weight:F1}", 
+                $"user:{activity.UserId}",
+                $"item:{activity.ItemId}",
+                $"action:{activity.ActivityType}",
+                $"weight:{activity.Weight:F1}",
                 $"time:{activity.Timestamp:yyyy-MM-dd HH:mm}"
             };
 

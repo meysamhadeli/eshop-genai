@@ -106,16 +106,16 @@ public class QdrantRepository<T> : IQdrantRepository<T> where T : class
         var id = GetEntityId(entity);
 
         var point = new PointStruct
-                    {
-                        Id = new PointId { Uuid = id },
-                        Vectors = vector.ToArray(),
-                        Payload =
+        {
+            Id = new PointId { Uuid = id },
+            Vectors = vector.ToArray(),
+            Payload =
                         {
                             ["entity"] = JsonSerializer.Serialize(entity),
                             ["type"] = typeof(T).Name,
                             ["timestamp"] = DateTime.UtcNow.ToString("O")
                         }
-                    };
+        };
 
         await _qdrantClient.UpsertAsync(_collectionName, new[] { point }, cancellationToken: cancellationToken);
         _logger.LogDebug("Indexed entity {EntityId}", id);
@@ -248,7 +248,7 @@ public class QdrantRepository<T> : IQdrantRepository<T> where T : class
 
         return idProperty?.GetValue(entity)?.ToString() ?? Guid.NewGuid().ToString();
     }
-    
+
     private string GenerateSearchText(T entity)
     {
         try
@@ -261,7 +261,7 @@ public class QdrantRepository<T> : IQdrantRepository<T> where T : class
                 .Where(value => !string.IsNullOrWhiteSpace(value));
 
             var result = string.Join(" ", properties);
-        
+
             return !string.IsNullOrWhiteSpace(result) ? result : JsonSerializer.Serialize(entity);
         }
         catch (System.Exception ex)

@@ -11,7 +11,7 @@ public class UserActivity
     public Dictionary<string, object> Metadata { get; set; } = new();
     public ActivityContext? Context { get; set; }
     public double Weight { get; set; } = 1.0;
-    
+
     [JsonIgnore]
     public string SearchableText { get; set; } = string.Empty;
 }
