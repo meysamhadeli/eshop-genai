@@ -1,7 +1,8 @@
 // Update CatalogDataSeeder.cs
 
+using BuildingBlocks.AI.Qdrant;
+using BuildingBlocks.AI.SemanticSearch;
 using BuildingBlocks.EFCore;
-using BuildingBlocks.SemanticSearch;
 using Catalog.Products.Dtos;
 using Catalog.Products.Models;
 using MapsterMapper;
@@ -15,22 +16,22 @@ public class CatalogDataSeeder : IDataSeeder
 {
     private readonly CatalogDbContext _catalogDbContext;
     private readonly IMapper _mapper;
-    private readonly ISemanticSearchService _semanticSearchService;
     private readonly ILogger<CatalogDataSeeder> _logger;
     private readonly CatalogReadDbContext _catalogReadDbContext;
+    private readonly IQdrantRepository<ProductReadModel> _qdrantRepository;
 
     public CatalogDataSeeder(
         CatalogDbContext catalogDbContext,
         IMapper mapper,
-        ISemanticSearchService semanticSearchService,
         ILogger<CatalogDataSeeder> logger,
-        CatalogReadDbContext catalogReadDbContext)
+        CatalogReadDbContext catalogReadDbContext,
+        IQdrantRepository<ProductReadModel> qdrantRepository)
     {
         _catalogDbContext = catalogDbContext;
         _mapper = mapper;
-        _semanticSearchService = semanticSearchService;
         _logger = logger;
         _catalogReadDbContext = catalogReadDbContext;
+        _qdrantRepository = qdrantRepository;
     }
 
     public async Task SeedAllAsync()
@@ -50,13 +51,12 @@ public class CatalogDataSeeder : IDataSeeder
             await _catalogDbContext.Products.AddRangeAsync(InitialData.Products);
             await _catalogDbContext.SaveChangesAsync();
 
-            await SeedMongoProducts();
-
-            await SeedSemanticSearchProductsAsync();
+            await SeedMongoProductsAsync();
+            await SeedQdrantProductsAsync();
         }
     }
 
-    private async Task SeedMongoProducts()
+    private async Task SeedMongoProductsAsync()
     {
         if (!await MongoQueryable.AnyAsync(_catalogReadDbContext.Product.AsQueryable()))
         {
@@ -64,20 +64,20 @@ public class CatalogDataSeeder : IDataSeeder
         }
     }
 
-    private async Task SeedSemanticSearchProductsAsync()
+    private async Task SeedQdrantProductsAsync()
     {
         var products = await EntityFrameworkQueryableExtensions.ToListAsync(_catalogDbContext.Products);
-        var productDtos = _mapper.Map<List<ProductDto>>(products);
+        var productReadModels = _mapper.Map<List<ProductReadModel>>(products);
 
-        foreach (var productDto in productDtos)
+        foreach (var productReadModel in productReadModels)
         {
             try
             {
-                await _semanticSearchService.IndexAsync(productDto);
+                await _qdrantRepository.IndexAsync(productReadModel);
             }
             catch (Exception ex)
             {
-                _logger.LogError("Failed to index product {ProductDtoId}: {ExMessage}", productDto.Id, ex.Message);
+                _logger.LogError("Failed to index product in Qdrant for {ProductReadModel}: {ExMessage}", productReadModel.Id, ex.Message);
             }
         }
     }

@@ -1,6 +1,6 @@
 namespace BuildingBlocks.Core.Pagination;
 
-public record PageList<T>(IReadOnlyList<T> Items, int PageNumber, int PageSize, int TotalCount) : IPageList<T>
+public record PageList<T>(IReadOnlyList<T> Items, int PageNumber, int PageSize, int TotalCount, bool HasExactMatches = true, string? Explanation = null) : IPageList<T>
     where T : class
 {
     public int CurrentPageSize => Items.Count;
@@ -10,10 +10,10 @@ public record PageList<T>(IReadOnlyList<T> Items, int PageNumber, int PageSize, 
     public bool HasPrevious => PageNumber > 1;
     public bool HasNext => PageNumber < TotalPages;
 
-    public static PageList<T> Empty => new(Enumerable.Empty<T>().ToList(), 0, 0, 0);
+    public static PageList<T> Empty => new(Enumerable.Empty<T>().ToList(), 0, 0, 0, true, null);
 
-    public static PageList<T> Create(IReadOnlyList<T> items, int pageNumber, int pageSize, int totalItems)
+    public static PageList<T> Create(IReadOnlyList<T> items, int pageNumber, int pageSize, int TotalCount, bool hasExactMatches = true, string? explanation = null)
     {
-        return new PageList<T>(items, pageNumber, pageSize, totalItems);
+        return new PageList<T>(items, pageNumber, pageSize, TotalCount, hasExactMatches, explanation);
     }
 }

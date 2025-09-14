@@ -31,6 +31,6 @@ public static class Extensions
             .ToAsyncEnumerable()
             .ToListAsync(cancellationToken: cancellationToken);
 
-        return PageList<TEntity>.Create(items.AsReadOnly(), pageRequest.PageNumber, pageRequest.PageSize, total);
+        return PageList<TEntity>.Create(items.AsReadOnly(), pageRequest.PageNumber, pageRequest.PageSize, total, true, null);
     }
 }

@@ -99,10 +99,13 @@ services:
     restart: unless-stopped
     ports:
       - "11434:11434"
+    environment:
+      - OLLAMA_THINKING=false
     volumes:
       - ollama_data:/root/.ollama
     networks:
       - eshop
+
 
   # #######################################################
   # #  Qdrant
@@ -294,6 +297,7 @@ services:
     image: grafana/loki:latest
     hostname: loki
     container_name: loki
+    restart: unless-stopped
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml

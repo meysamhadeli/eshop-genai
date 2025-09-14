@@ -1,5 +1,6 @@
+using BuildingBlocks.AI.Qdrant;
+using BuildingBlocks.AI.SemanticSearch;
 using BuildingBlocks.Core.Pagination;
-using BuildingBlocks.SemanticSearch;
 using BuildingBlocks.Web;
 using Catalog.Data;
 using Catalog.Products.Dtos;
@@ -37,33 +38,24 @@ public class GetProductsHandler : IRequestHandler<GetProducts, PageList<ProductD
         GetProducts request,
         CancellationToken cancellationToken)
     {
-        if (request.UseSemanticSearch && !string.IsNullOrWhiteSpace(request.SearchTerm))
+        if (request.UseSemanticSearch && !string.IsNullOrEmpty(request.SearchTerm))
         {
-            var semanticResults = await _semanticSearchService.SemanticSearchAsync<Product, ProductDto>(
+            var semanticResults = await _semanticSearchService.SemanticSearchAsync<ProductReadModel>(
                 request.SearchTerm,
                 maxResults: request.PageSize,
                 cancellationToken: cancellationToken);
 
-            if (semanticResults.Any())
+            if (semanticResults.Results.Any())
             {
-                var productIds = semanticResults.Select(p => p.Id).ToList();
+                var productDtos = _mapper.Map<IReadOnlyList<ProductDto>>(semanticResults.Results);
 
-                var products = await _catalogReadDbContext.Product.AsQueryable()
-                    .Where(p => productIds.Contains(p.Id))
-                    .ToListAsync(cancellationToken);
-
-                var productDtos = _mapper.Map<List<ProductDto>>(products);
-
-                var orderedResults = productIds
-                    .Select(id => productDtos.FirstOrDefault(p => p.Id == id))
-                    .Where(p => p != null)
-                    .ToList();
-
-                return new PageList<ProductDto>(
-                    orderedResults!,
-                    orderedResults.Count,
+                return PageList<ProductDto>.Create(
+                    productDtos,
                     request.PageNumber,
-                    request.PageSize);
+                    request.PageSize,
+                    semanticResults.TotalCounts,
+                    semanticResults.HasExactMatches,
+                    semanticResults.Explanation);
             }
         }
 
@@ -94,7 +86,7 @@ public class GetProductsHandler : IRequestHandler<GetProducts, PageList<ProductD
 
         var productDtos = _mapper.Map<List<ProductDto>>(products);
 
-        return new PageList<ProductDto>(
+        return PageList<ProductDto>.Create(
             productDtos,
             totalCount,
             request.PageNumber,

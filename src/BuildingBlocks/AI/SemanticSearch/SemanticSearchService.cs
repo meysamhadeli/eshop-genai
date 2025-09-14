@@ -1,54 +1,55 @@
 using System.Linq.Expressions;
 using System.Text.Json;
-using BuildingBlocks.AI.SemanticSearch;
+using BuildingBlocks.AI.Qdrant;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Embeddings;
-using Qdrant.Client;
-using Qdrant.Client.Grpc;
 
-namespace BuildingBlocks.SemanticSearch;
+namespace BuildingBlocks.AI.SemanticSearch;
 
 public interface ISemanticSearchService
 {
-    Task<IEnumerable<TResult>> SemanticSearchAsync<T, TResult>(
+    Task<SearchResult<TResult>> SemanticSearchAsync<TResult>(
         string query,
-        Expression<Func<T, bool>>? filter = null,
+        Expression<Func<TResult, bool>>? filter = null,
         int maxResults = 10,
         double similarityThreshold = 0.7,
-        CancellationToken cancellationToken = default)
-    where T : class
+        bool includeExplanation = false,
+        CancellationToken cancellationToken = default
+    )
     where TResult : class;
 
-    Task IndexAsync<T>(T entity, CancellationToken cancellationToken = default) where T : class;
-    Task UpdateAsync<T>(T entity, CancellationToken cancellationToken = default) where T : class;
-    Task DeleteAsync<T>(object id, CancellationToken cancellationToken = default) where T : class;
-
-    Task EnsureCollectionExists<T>(CancellationToken cancellationToken = default) where T : class;
-    Task<bool> CollectionExistsAsync<T>(CancellationToken cancellationToken = default) where T : class;
-    Task DeleteCollectionAsync<T>(CancellationToken cancellationToken = default) where T : class;
-    Task<List<string>> ListCollectionsAsync(CancellationToken cancellationToken = default);
+    Task<IEnumerable<T>> SearchVectorsAsync<T>(
+        float[] vector,
+        int maxResults = 10,
+        double similarityThreshold = 0.7,
+        CancellationToken cancellationToken = default) where T : class;
 }
 
 public class SemanticSearchService : ISemanticSearchService
 {
-    private readonly SemanticSearchOptions _options;
-    private readonly QdrantClient _qdrantClient;
+    private readonly AIOptions _options;
     private readonly ITextEmbeddingGenerationService _embeddingService;
+    private readonly IChatCompletionService _chatService;
     private readonly ILogger<SemanticSearchService> _logger;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly bool _isEnabled;
 
     public SemanticSearchService(
-        IOptions<SemanticSearchOptions> options,
-        QdrantClient qdrantClient,
+        IOptions<AIOptions> options,
         ITextEmbeddingGenerationService embeddingService,
-        ILogger<SemanticSearchService> logger)
+        IChatCompletionService chatService,
+        ILogger<SemanticSearchService> logger,
+        IServiceScopeFactory scopeFactory)
     {
         _options = options.Value;
-        _qdrantClient = qdrantClient;
         _embeddingService = embeddingService;
+        _chatService = chatService;
         _logger = logger;
-        _isEnabled = _options.Enabled;
+        _scopeFactory = scopeFactory;
+        _isEnabled = _options.SemanticSearchEnabled;
 
         if (_isEnabled)
         {
@@ -60,238 +61,156 @@ public class SemanticSearchService : ISemanticSearchService
         }
     }
 
-    public async Task<IEnumerable<TResult>> SemanticSearchAsync<T, TResult>(
+    public async Task<SearchResult<TResult>> SemanticSearchAsync<TResult>(
         string query,
-        Expression<Func<T, bool>>? filter = null,
+        Expression<Func<TResult, bool>>? filter = null,
         int maxResults = 10,
         double similarityThreshold = 0.7,
+        bool includeExplanation = false,
         CancellationToken cancellationToken = default)
-        where T : class
         where TResult : class
     {
-        if (!_isEnabled) return Enumerable.Empty<TResult>();
+        if (!_isEnabled) return new SearchResult<TResult>();
 
         try
         {
-            var collectionName = GetCollectionName<T>();
-
-            // Check if collection exists before searching
-            var collectionExists = await _qdrantClient.CollectionExistsAsync(collectionName, cancellationToken);
-            if (!collectionExists)
+            var repo = GetRepository<TResult>();
+            if (!await repo.CollectionExistsAsync(cancellationToken))
             {
-                _logger.LogWarning("Collection {CollectionName} does not exist, returning empty results", collectionName);
-                return Enumerable.Empty<TResult>();
+                _logger.LogWarning("Collection for {TypeName} does not exist", typeof(TResult).Name);
+                return new SearchResult<TResult>();
             }
 
             var queryEmbedding = await _embeddingService.GenerateEmbeddingAsync(query, cancellationToken: cancellationToken);
 
-            var searchResult = await _qdrantClient.SearchAsync(
-                collectionName: collectionName,
-                vector: queryEmbedding.ToArray(),
-                limit: (ulong?)_options?.MaxResults ?? (ulong)maxResults,
-                scoreThreshold: (float?)_options?.SimilarityThreshold ?? (float?)similarityThreshold,
-                cancellationToken: cancellationToken);
+            var scoredPoints = await repo.SearchAsync(
+                queryEmbedding.ToArray(),
+                maxResults,
+                similarityThreshold,
+                cancellationToken);
 
-            var entities = new List<TResult>();
+            var averageSimilarity = scoredPoints.Any() ? scoredPoints.Average(p => p.Score) : 0.0;
 
-            foreach (var point in searchResult)
+            var entities = scoredPoints
+                .Select(repo.ExtractEntity)
+                .Where(e => e != null)
+                .Select(e => e!)
+                .ToList();
+
+            if (filter != null)
             {
-                try
-                {
-                    if (point.Payload.TryGetValue("entity", out var entityJson))
-                    {
-                        var entity = JsonSerializer.Deserialize<TResult>(entityJson.StringValue);
-                        if (entity != null)
-                        {
-                            entities.Add(entity);
-                        }
-                    }
-                }
-                catch (JsonException ex)
-                {
-                    _logger.LogWarning(ex, "Failed to deserialize entity from vector store");
-                }
+                var compiledFilter = filter.Compile();
+                entities = entities.Where(compiledFilter).ToList();
             }
 
-            _logger.LogInformation("Semantic search found {Count} entities for query: {Query}", entities.Count, query);
-            return entities;
+            var explanation = includeExplanation || _options.SearchExplanationEnabled
+                ? await GenerateExplanationAsync(query, entities, averageSimilarity, cancellationToken)
+                : null;
+
+            return new SearchResult<TResult>
+            {
+                Results = entities,
+                Explanation = explanation,
+                OriginalQuery = query,
+                HasExactMatches = entities.Any(),
+                TotalCounts = entities.Count,
+                AverageSimilarity = averageSimilarity,
+                Timestamp = DateTime.UtcNow
+            };
         }
         catch (System.Exception ex)
         {
             _logger.LogError(ex, "Failed to perform semantic search for query: {Query}", query);
-            return Enumerable.Empty<TResult>();
+            return new SearchResult<TResult>();
         }
     }
 
-    public async Task IndexAsync<T>(T entity, CancellationToken cancellationToken = default) where T : class
+    public async Task<IEnumerable<T>> SearchVectorsAsync<T>(
+        float[] vector,
+        int maxResults = 10,
+        double similarityThreshold = 0.7,
+        CancellationToken cancellationToken = default) where T : class
     {
-        if (!_isEnabled) return;
-
+        if (!_isEnabled) return Enumerable.Empty<T>();
         try
         {
-            // Ensure collection exists before indexing
-            await EnsureCollectionExists<T>(cancellationToken);
+            var repo = GetRepository<T>();
+            var scoredPoints = await repo.SearchAsync(vector, maxResults, similarityThreshold, cancellationToken);
+            return scoredPoints
+                .Select(repo.ExtractEntity)
+                .Where(e => e != null)!;
+        }
+        catch (System.Exception ex)
+        {
+            _logger.LogError(ex, "Failed to perform vector search");
+            return Enumerable.Empty<T>();
+        }
+    }
 
-            var collectionName = GetCollectionName<T>();
-            var entityId = GetEntityId(entity);
-            var text = GenerateSearchText(entity);
 
-            var embedding = await _embeddingService.GenerateEmbeddingAsync(text, cancellationToken: cancellationToken);
+    private async Task<string?> GenerateExplanationAsync<TResult>(
+        string query,
+        List<TResult> results,
+        double averageSimilarity,
+        CancellationToken cancellationToken) where TResult : class
+    {
+        try
+        {
+            var chatHistory = new ChatHistory();
 
-            var point = new PointStruct
+            chatHistory.AddSystemMessage($"""
+                You are a helpful search assistant that provides explanations for search results.
+                Your task is to explain the search results to the user in a friendly, helpful manner.
+
+                Guidelines:
+                1. If there are no exact matches, acknowledge this and suggest similar alternatives
+                2. If there are results, explain how they relate to the user's query
+                3. Be concise but helpful (2-3 sentences)
+                4. Use natural, conversational language
+                5. If suggesting alternatives, mention they are similar but not exact matches
+                6. Consider the average similarity score: {averageSimilarity:F2}
+
+                Current query: {query}
+                Number of results found: {results.Count}
+                """);
+
+            var resultsJson = JsonSerializer.Serialize(results.Take(3), new JsonSerializerOptions
             {
-                Id = new PointId { Uuid = entityId },
-                Vectors = embedding.ToArray(),
-                Payload =
-                {
-                    ["text"] = text,
-                    ["entity"] = JsonSerializer.Serialize(entity),
-                    ["type"] = typeof(T).Name,
-                    ["timestamp"] = DateTime.UtcNow.ToString("O")
-                }
-            };
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
 
-            await _qdrantClient.UpsertAsync(collectionName, new[] { point }, cancellationToken: cancellationToken);
+            chatHistory.AddUserMessage($"""
+                Please provide a helpful explanation for these search results.
 
-            _logger.LogDebug("Entity {EntityId} indexed successfully in collection {Collection}", entityId, collectionName);
+                User Query: "{query}"
+
+                Search Results (first 3 items):
+                {resultsJson}
+
+                Average similarity score: {averageSimilarity:F2}
+
+                Please provide a concise, helpful explanation that:
+                1. Acknowledges whether exact matches were found
+                2. Explains the relationship between results and query
+                3. Suggests alternatives if no exact matches or low similarity
+                4. Is friendly and encouraging
+                5. References the similarity score if relevant
+                """);
+
+            var response = await _chatService.GetChatMessageContentAsync(chatHistory, cancellationToken: cancellationToken);
+            return response.Content;
         }
         catch (System.Exception ex)
         {
-            _logger.LogError(ex, "Failed to index entity {Entity}", entity);
+            _logger.LogError(ex, "Failed to generate search explanation");
+            return null;
         }
     }
 
-    public async Task UpdateAsync<T>(T entity, CancellationToken cancellationToken = default) where T : class
+    private IQdrantRepository<T> GetRepository<T>() where T : class
     {
-        if (!_isEnabled) return;
-
-        try
-        {
-            var entityId = GetEntityId(entity);
-            await DeleteAsync<T>(entityId, cancellationToken);
-            await IndexAsync(entity, cancellationToken);
-            _logger.LogDebug("Entity {EntityId} updated in vector store", entityId);
-        }
-        catch (System.Exception ex)
-        {
-            _logger.LogError(ex, "Failed to update entity {Entity}", entity);
-        }
-    }
-
-    public async Task DeleteAsync<T>(object id, CancellationToken cancellationToken = default) where T : class
-    {
-        if (!_isEnabled) return;
-
-        try
-        {
-            var collectionName = GetCollectionName<T>();
-            await _qdrantClient.DeleteAsync(
-                collectionName: collectionName,
-                id: new PointId { Uuid = id.ToString() },
-                cancellationToken: cancellationToken);
-
-            _logger.LogDebug("Entity {EntityId} deleted from collection {Collection}", id, collectionName);
-        }
-        catch (System.Exception ex)
-        {
-            _logger.LogError(ex, "Failed to delete entity {EntityId} from collection", id);
-        }
-    }
-
-    public async Task EnsureCollectionExists<T>(CancellationToken cancellationToken = default) where T : class
-    {
-        if (!_isEnabled) return;
-
-        var collectionName = GetCollectionName<T>();
-
-        try
-        {
-            var collectionExists = await _qdrantClient.CollectionExistsAsync(collectionName, cancellationToken);
-
-            if (!collectionExists)
-            {
-                await _qdrantClient.CreateCollectionAsync(
-                    collectionName: collectionName,
-                    vectorsConfig: new VectorParams
-                    {
-                        Size = (uint)_options.VectorSize,
-                        Distance = Distance.Cosine
-                    },
-                    cancellationToken: cancellationToken);
-
-                _logger.LogInformation("Created collection {CollectionName} with vector size {VectorSize}",
-                    collectionName, _options.VectorSize);
-            }
-        }
-        catch (System.Exception ex)
-        {
-            _logger.LogError(ex, "Failed to create collection {CollectionName}", collectionName);
-            throw;
-        }
-    }
-
-    public async Task<bool> CollectionExistsAsync<T>(CancellationToken cancellationToken = default) where T : class
-    {
-        if (!_isEnabled) return false;
-
-        var collectionName = GetCollectionName<T>();
-        return await _qdrantClient.CollectionExistsAsync(collectionName, cancellationToken);
-    }
-
-    public async Task DeleteCollectionAsync<T>(CancellationToken cancellationToken = default) where T : class
-    {
-        if (!_isEnabled) return;
-
-        var collectionName = GetCollectionName<T>();
-        await _qdrantClient.DeleteCollectionAsync(collectionName, cancellationToken: cancellationToken);
-        _logger.LogInformation("Deleted collection {CollectionName}", collectionName);
-    }
-
-    public async Task<List<string>> ListCollectionsAsync(CancellationToken cancellationToken = default)
-    {
-        if (!_isEnabled) return new List<string>();
-
-        var collections = await _qdrantClient.ListCollectionsAsync(cancellationToken);
-        return collections.ToList();
-    }
-
-    private string GetCollectionName<T>() where T : class
-    {
-        var typeName = typeof(T).Name.ToLowerInvariant();
-
-        // Remove common suffixes
-        var suffixesToRemove = new[] { "dto", "model", "entity", "record", "viewmodel" };
-        foreach (var suffix in suffixesToRemove)
-        {
-            if (typeName.EndsWith(suffix) && typeName.Length > suffix.Length)
-            {
-                typeName = typeName.Substring(0, typeName.Length - suffix.Length);
-                break;
-            }
-        }
-
-        return $"{_options.DefaultCollectionPrefix}{typeName}";
-    }
-
-    private string GetEntityId<T>(T entity) where T : class
-    {
-        // Try to get ID property using reflection
-        var idProperty = typeof(T).GetProperties()
-            .FirstOrDefault(p => p.Name.Equals("Id", StringComparison.OrdinalIgnoreCase) ||
-                                p.Name.Equals(typeof(T).Name + "Id", StringComparison.OrdinalIgnoreCase));
-
-        return idProperty?.GetValue(entity)?.ToString() ?? Guid.NewGuid().ToString();
-    }
-
-    private string GenerateSearchText<T>(T entity) where T : class
-    {
-        // Create searchable text from entity properties
-        var properties = typeof(T).GetProperties()
-            .Where(p => p.PropertyType == typeof(string) &&
-                       !p.Name.Equals("Id", StringComparison.OrdinalIgnoreCase))
-            .Select(p => p.GetValue(entity)?.ToString())
-            .Where(value => !string.IsNullOrEmpty(value));
-
-        return string.Join(" ", properties);
+        using var scope = _scopeFactory.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<IQdrantRepository<T>>();
     }
 }

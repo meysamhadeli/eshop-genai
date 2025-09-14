@@ -1,3 +1,7 @@
+using BuildingBlocks.AI;
+using BuildingBlocks.AI.Qdrant;
+using BuildingBlocks.AI.Recommendation;
+using BuildingBlocks.AI.SemanticKernel;
 using BuildingBlocks.AI.SemanticSearch;
 using BuildingBlocks.Caching;
 using BuildingBlocks.Core;
@@ -71,7 +75,12 @@ public static class InfrastructureExtensions
                                  });
 
         builder.Services.AddCustomHybridCaching();
-        builder.Services.AddSemanticSearch();
+
+        builder.Services.AddQdrant();
+
+        builder.Services.AddSemanticKernel()
+            .AddSemanticSearch()
+            .AddRecommendationService();
 
         return builder;
     }
