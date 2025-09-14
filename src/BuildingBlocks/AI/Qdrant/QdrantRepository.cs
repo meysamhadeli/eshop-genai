@@ -97,7 +97,7 @@ public class QdrantRepository<T> : IQdrantRepository<T> where T : class
     public async Task IndexAsync(T entity, CancellationToken cancellationToken = default)
     {
         if (_embeddingService == null)
-            throw new InvalidOperationException("Embedding service is not configured. Register ITextEmbeddingGenerationService.");
+            throw new InvalidOperationException("Embedding service is not configured.");
 
         await EnsureCollectionExistsAsync(cancellationToken);
 
@@ -106,21 +106,19 @@ public class QdrantRepository<T> : IQdrantRepository<T> where T : class
         var id = GetEntityId(entity);
 
         var point = new PointStruct
-        {
-            Id = new PointId { Uuid = id },
-            Vectors = vector.ToArray(),
-            Payload =
+                    {
+                        Id = new PointId { Uuid = id },
+                        Vectors = vector.ToArray(),
+                        Payload =
                         {
-                            ["text"] = text,
                             ["entity"] = JsonSerializer.Serialize(entity),
                             ["type"] = typeof(T).Name,
                             ["timestamp"] = DateTime.UtcNow.ToString("O")
                         }
-        };
+                    };
 
         await _qdrantClient.UpsertAsync(_collectionName, new[] { point }, cancellationToken: cancellationToken);
-
-        _logger.LogDebug("Indexed entity {EntityId} by text in collection {CollectionName}", id, _collectionName);
+        _logger.LogDebug("Indexed entity {EntityId}", id);
     }
 
     public async Task UpdateAsync(T entity, CancellationToken cancellationToken = default)
@@ -250,16 +248,27 @@ public class QdrantRepository<T> : IQdrantRepository<T> where T : class
 
         return idProperty?.GetValue(entity)?.ToString() ?? Guid.NewGuid().ToString();
     }
-
+    
     private string GenerateSearchText(T entity)
     {
-        var properties = typeof(T).GetProperties()
-            .Where(p => p.PropertyType == typeof(string) &&
-                        !p.Name.Equals("Id", StringComparison.OrdinalIgnoreCase))
-            .Select(p => p.GetValue(entity)?.ToString())
-            .Where(value => !string.IsNullOrEmpty(value));
+        try
+        {
+            var properties = typeof(T).GetProperties()
+                .Where(p => p.PropertyType == typeof(string) || p.PropertyType == typeof(int) &&
+                            !p.Name.Equals("Id", StringComparison.OrdinalIgnoreCase) &&
+                            p.CanRead)
+                .Select(p => p.GetValue(entity)?.ToString())
+                .Where(value => !string.IsNullOrWhiteSpace(value));
 
-        return string.Join(" ", properties);
+            var result = string.Join(" ", properties);
+        
+            return !string.IsNullOrWhiteSpace(result) ? result : JsonSerializer.Serialize(entity);
+        }
+        catch (System.Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to generate search text for type {Type}, falling back to JSON", typeof(T).Name);
+            return JsonSerializer.Serialize(entity);
+        }
     }
 
     private float[]? ExtractVectorFromPoint(RetrievedPoint point)

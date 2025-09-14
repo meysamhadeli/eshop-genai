@@ -1,27 +1,39 @@
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { fetchProductById } from '@/features/catalog/products/services/product-service'
+import { fetchProductById, trackUserActivity } from '@/features/catalog/products/services/product-service'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { ProductDto } from '@/features/catalog/products/models/ProductDto'
-import fallbackImg from '@/assets/images/default_product.jpg'
 import { fetchBasket, updateBasketItem } from '@/features/basket/baskets/services/basket-service'
-
-// Price formatting utility
-const formatPrice = (price: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'decimal',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(price);
-};
+import { formatCurrency } from '@/shared/lib/currency'
+import fallbackImg from '@/assets/images/default_product.jpg'
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
+  const hasTrackedRef = useRef(false)
 
   const [quantity, setQuantity] = useState(0)
   const [inputValue, setInputValue] = useState('0')
+
+  useEffect(() => {
+    if (id && !hasTrackedRef.current) {
+      hasTrackedRef.current = true 
+      
+      trackUserActivity({
+        userId: 'user-123',
+        itemId: id,
+        activityType: 'view',
+        context: {
+          sessionId: sessionStorage.getItem('sessionId') || undefined,
+          deviceType: navigator.userAgent,
+          referrer: document.referrer || undefined
+        }
+      }).catch(error => {
+        console.error('Failed to track activity:', error)
+      })
+    }
+  }, [id]) // Only depends on id
 
   const { data: product, isLoading, error } = useQuery<ProductDto>({
     queryKey: ['product', id],
@@ -32,6 +44,7 @@ export default function ProductDetailPage() {
   const { data: basket } = useQuery({
     queryKey: ['basket'],
     queryFn: () => fetchBasket('user-123').then(res => res.data),
+    refetchOnWindowFocus: false,
     initialData: {
       id: '',
       userId: 'user-123',
@@ -55,7 +68,7 @@ export default function ProductDetailPage() {
   }, [basket, id])
 
   const updateBasket = useMutation({
-    mutationFn: (qty: number) =>  updateBasketItem(id!, qty),
+    mutationFn: (qty: number) => updateBasketItem(id!, qty),
     onSuccess: () => {
       queryClient.refetchQueries({ queryKey: ['basket'] })
     },
@@ -73,7 +86,6 @@ export default function ProductDetailPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
-    // Allow empty string (will be treated as 0) or numeric values
     if (value === '' || /^\d+$/.test(value)) {
       setInputValue(value)
     }
@@ -81,7 +93,7 @@ export default function ProductDetailPage() {
 
   const handleInputBlur = () => {
     let newQty = parseInt(inputValue) || 0
-    newQty = Math.max(0, newQty) // Ensure it's not negative
+    newQty = Math.max(0, newQty)
     updateQuantity(newQty)
   }
 
@@ -108,7 +120,7 @@ export default function ProductDetailPage() {
         <h1 className="text-3xl font-bold mb-3 text-gray-800">{product.name}</h1>
         <p className="text-gray-700 mb-6 leading-relaxed">{product.description}</p>
         <p className="text-amazon-dark text-2xl font-bold mb-6">
-          ${formatPrice(product.price)}
+          ${formatCurrency(product.price)}
         </p>
 
         <div className="flex items-center gap-4 mb-6">

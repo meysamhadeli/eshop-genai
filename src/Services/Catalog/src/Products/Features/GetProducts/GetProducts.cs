@@ -38,7 +38,7 @@ public class GetProductsHandler : IRequestHandler<GetProducts, PageList<ProductD
         GetProducts request,
         CancellationToken cancellationToken)
     {
-        if (request.UseSemanticSearch && !string.IsNullOrWhiteSpace(request.SearchTerm))
+        if (request.UseSemanticSearch && !string.IsNullOrEmpty(request.SearchTerm))
         {
             var semanticResults = await _semanticSearchService.SemanticSearchAsync<ProductReadModel>(
                 request.SearchTerm,

@@ -1,5 +1,4 @@
 using BuildingBlocks.AI.Recommendation;
-using BuildingBlocks.AI.SemanticSearch;
 using BuildingBlocks.Web;
 using MediatR;
 
@@ -46,7 +45,7 @@ public class TrackUserActivityEndpoints : IMinimalEndpoint
 {
     public IEndpointRouteBuilder MapEndpoint(IEndpointRouteBuilder builder)
     {
-        builder.MapPost($"{EndpointConfig.BaseApiPath}/recommendations/activity", async (
+        builder.MapPost($"{EndpointConfig.BaseApiPath}/product/recommendations/activity", async (
             TrackUserActivity command,
             IMediator mediator,
             CancellationToken cancellationToken) =>

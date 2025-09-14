@@ -99,18 +99,13 @@ services:
     restart: unless-stopped
     ports:
       - "11434:11434"
+    environment:
+      - OLLAMA_THINKING=false
     volumes:
       - ollama_data:/root/.ollama
     networks:
       - eshop
-    command: >
-      sh -c "
-        ollama serve &
-        sleep 5 &&
-        ollama pull qwen3:0.6b &&
-        ollama pull nomic-embed-text &&
-        wait
-      "
+
 
   # #######################################################
   # #  Qdrant

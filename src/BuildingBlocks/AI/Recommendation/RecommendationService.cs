@@ -1,50 +1,55 @@
+using System.Globalization;
 using System.Text.Json;
 using BuildingBlocks.AI.Qdrant;
+using Humanizer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.SemanticKernel.Embeddings;
 
 namespace BuildingBlocks.AI.Recommendation;
 
 public interface IRecommendationService
 {
     Task TrackUserActivityAsync(UserActivity activity, CancellationToken cancellationToken = default);
-
     Task<SearchResult<T>> GetRecommendationsAsync<T>(
         string userId,
         int maxResults = 5,
+        double similarityThreshold = 0.6,
         bool includeExplanation = false,
-        CancellationToken cancellationToken = default
-    ) where T : class;
+        CancellationToken cancellationToken = default) where T : class;
 }
 
 public class RecommendationService : IRecommendationService
 {
     private readonly IQdrantRepository<UserActivity> _activityRepository;
     private readonly IChatCompletionService _chatService;
+    private readonly ITextEmbeddingGenerationService _embeddingService;
     private readonly ILogger<RecommendationService> _logger;
-    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IServiceProvider _serviceProvider;
     private readonly AIOptions _options;
     private readonly bool _isEnabled;
 
     public RecommendationService(
         IQdrantRepository<UserActivity> activityRepository,
         IChatCompletionService chatService,
+        ITextEmbeddingGenerationService embeddingService,
         IOptions<AIOptions> options,
         ILogger<RecommendationService> logger,
-        IServiceScopeFactory scopeFactory)
+        IServiceProvider serviceProvider)
     {
         _activityRepository = activityRepository;
         _chatService = chatService;
+        _embeddingService = embeddingService;
         _logger = logger;
-        _scopeFactory = scopeFactory;
         _options = options.Value;
         _isEnabled = _options.RecommendationEnabled;
+        _serviceProvider = serviceProvider;
 
         if (_isEnabled)
         {
-            _logger.LogInformation("Recommendation service initialized with direct Qdrant access");
+            _logger.LogInformation("Recommendation service initialized");
         }
         else
         {
@@ -58,12 +63,15 @@ public class RecommendationService : IRecommendationService
 
         try
         {
-            activity.Id = $"{activity.UserId}_{activity.ItemId}_{activity.Timestamp.Ticks}";
+            activity.SearchableText = GenerateActivitySearchText(activity);
             activity.Weight = GetActivityWeight(activity.ActivityType);
+            activity.Timestamp = DateTime.UtcNow;
 
+            await _activityRepository.EnsureCollectionExistsAsync(cancellationToken);
             await _activityRepository.IndexAsync(activity, cancellationToken);
 
-            _logger.LogDebug("Tracked user activity: {UserId} {ActivityType} {ItemId}", activity.UserId, activity.ActivityType, activity.ItemId);
+            _logger.LogDebug("Tracked user activity: {UserId} {ActivityType} {ItemId}", 
+                activity.UserId, activity.ActivityType, activity.ItemId);
         }
         catch (System.Exception ex)
         {
@@ -74,6 +82,7 @@ public class RecommendationService : IRecommendationService
     public async Task<SearchResult<T>> GetRecommendationsAsync<T>(
         string userId,
         int maxResults = 5,
+        double similarityThreshold = 0.6,
         bool includeExplanation = false,
         CancellationToken cancellationToken = default) where T : class
     {
@@ -85,66 +94,35 @@ public class RecommendationService : IRecommendationService
             };
         }
 
-        var activityPriority = new[]
-        {
-            ActivityTypes.Purchase,
-            ActivityTypes.AddToCart,
-            ActivityTypes.Bookmark,
-            ActivityTypes.Like,
-            ActivityTypes.Rating,
-            ActivityTypes.Comment,
-            ActivityTypes.Click,
-            ActivityTypes.View
-        };
-
         try
         {
-            _logger.LogDebug("Getting recommendations for user {UserId}", userId);
+            _logger.LogDebug("Getting {TypeName} recommendations for user {UserId}", typeof(T).Name, userId);
 
-            var recentActivity = await GetMostRelevantActivity(userId, activityPriority, cancellationToken);
-            if (recentActivity == null)
+            var userActivities = await GetUserActivities(userId, cancellationToken);
+            if (!userActivities.Any())
             {
-                _logger.LogDebug("No relevant activities found for user {UserId}", userId);
-                return new SearchResult<T>
-                {
-                    Explanation = includeExplanation
-                        ? "We couldn't find enough activity history to provide personalized recommendations. Try exploring more items!"
-                        : null
-                };
+                _logger.LogDebug("No activities found for user {UserId}", userId);
+                return await GetFallbackRecommendations<T>(maxResults, similarityThreshold, includeExplanation, cancellationToken);
             }
 
-            var itemRepository = GetItemRepository<T>();
-
-            var itemVector = await itemRepository.GetVectorAsync(recentActivity.ItemId, cancellationToken);
-            if (itemVector == null)
+            var targetRepository = GetRepository<T>();
+            if (targetRepository == null)
             {
-                _logger.LogWarning("Item vector not found for {ItemId}", recentActivity.ItemId);
-                return new SearchResult<T>
-                {
-                    Explanation = includeExplanation
-                        ? "We're having trouble finding recommendations based on your recent activity."
-                        : null
-                };
+                _logger.LogWarning("Repository not found for type: {TypeName}", typeof(T).Name);
+                return new SearchResult<T>();
             }
 
-            var boostedVector = ApplyWeightToVector(itemVector, GetActivityWeight(recentActivity.ActivityType));
-
-            var scoredPoints = await itemRepository.SearchAsync(
-                boostedVector,
-                maxResults,
-                0.6,
-                cancellationToken);
-
-            var averageSimilarity = scoredPoints.Any() ? scoredPoints.Average(p => p.Score) : 0.0;
-
-            var recommendations = scoredPoints
-                .Select(itemRepository.ExtractEntity)
-                .Where(e => e != null)
-                .Take(maxResults)
-                .ToList();
+            var recommendations = await GetRecommendationsFromActivities<T>(
+                userActivities, targetRepository, maxResults, similarityThreshold, cancellationToken);
+            
+            if (!recommendations.Any())
+            {
+                _logger.LogDebug("No recommendations found for user {UserId}", userId);
+                return await GetFallbackRecommendations<T>(maxResults, similarityThreshold, includeExplanation, cancellationToken);
+            }
 
             var explanation = includeExplanation || _options.RecommendationExplanationEnabled
-                ? await GenerateRecommendationExplanationAsync(userId, recommendations, recentActivity, cancellationToken)
+                ? await GenerateRecommendationExplanationAsync(userId, recommendations, userActivities.First(), cancellationToken)
                 : null;
 
             _logger.LogInformation("Found {Count} recommendations for user {UserId}", recommendations.Count, userId);
@@ -153,10 +131,10 @@ public class RecommendationService : IRecommendationService
             {
                 Results = recommendations,
                 Explanation = explanation,
-                OriginalQuery = $"Recommendations for user {userId} based on {recentActivity.ActivityType} activity",
+                OriginalQuery = $"Recommendations for user {userId} based on {userActivities.Count} activities",
                 HasExactMatches = recommendations.Any(),
                 TotalCounts = recommendations.Count,
-                AverageSimilarity = averageSimilarity, // ✅ Real score from Qdrant!
+                AverageSimilarity = CalculateAverageSimilarity(recommendations),
                 Timestamp = DateTime.UtcNow
             };
         }
@@ -172,42 +150,224 @@ public class RecommendationService : IRecommendationService
         }
     }
 
-    private async Task<UserActivity?> GetMostRelevantActivity(
-        string userId,
-        string[] activityTypes,
-        CancellationToken cancellationToken = default)
+    private async Task<List<UserActivity>> GetUserActivities(string userId, CancellationToken cancellationToken)
     {
         try
         {
+            _logger.LogDebug("Searching for activities for user {UserId}", userId);
+            
             var scoredPoints = await _activityRepository.SearchByTextAsync(
-                 userId,
-                20,
-                0.0, // Low threshold to cast wide net
+                userId, 
+                50,
+                0.3,
                 cancellationToken);
 
             var activities = scoredPoints
                 .Select(_activityRepository.ExtractEntity)
-                .Where(a => a != null && a.UserId == userId && activityTypes.Contains(a.ActivityType))
+                .Where(a => a != null && a.UserId == userId)
+                .OrderByDescending(a => a.Timestamp)
                 .ToList();
 
-            var relevantActivity = activities
-                .OrderByDescending(a => GetActivityWeight(a.ActivityType))
-                .ThenByDescending(a => a.Timestamp)
-                .FirstOrDefault();
-
-            if (relevantActivity != null)
+            _logger.LogDebug("Found {Count} activities for user {UserId}", activities.Count, userId);
+            
+            foreach (var activity in activities)
             {
-                _logger.LogDebug("Found relevant activity: {ActivityType} for {ItemId}",
-                    relevantActivity.ActivityType, relevantActivity.ItemId);
+                _logger.LogDebug("Activity: User={UserId}, Item={ItemId}, Type={ActivityType}", 
+                    activity.UserId, activity.ItemId, activity.ActivityType);
             }
-
-            return relevantActivity;
+            
+            return activities;
         }
         catch (System.Exception ex)
         {
             _logger.LogWarning(ex, "Failed to get user activities for {UserId}", userId);
+            return new List<UserActivity>();
+        }
+    }
+
+    private async Task<List<T>> GetRecommendationsFromActivities<T>(
+        List<UserActivity> userActivities,
+        IQdrantRepository<T> targetRepository,
+        int maxResults,
+        double similarityThreshold,
+        CancellationToken cancellationToken) where T : class
+    {
+        var allRecommendations = new List<T>();
+        var seenItemIds = new HashSet<string>();
+
+        foreach (var activity in userActivities.OrderByDescending(a => GetActivityWeight(a.ActivityType)))
+        {
+            try
+            {
+                _logger.LogDebug("Processing activity for item {ItemId} by user {UserId}", activity.ItemId, activity.UserId);
+
+                var sourceItem = await targetRepository.GetByIdAsync(activity.ItemId, cancellationToken);
+                if (sourceItem == null)
+                {
+                    _logger.LogWarning("Item {ItemId} not found in target repository", activity.ItemId);
+                    continue;
+                }
+
+                var itemVector = await GenerateItemVectorAsync(sourceItem, cancellationToken);
+                if (itemVector == null) continue;
+
+                var boostedVector = ApplyWeightToVector(itemVector, activity.Weight);
+
+                // Search for similar ITEMS in the target repository
+                var scoredPoints = await targetRepository.SearchAsync(
+                    boostedVector,
+                    maxResults * 2,
+                    similarityThreshold,
+                    cancellationToken);
+
+                var similarItems = scoredPoints
+                    .Select(targetRepository.ExtractEntity)
+                    .Where(item => item != null && !IsSameItem(item, activity.ItemId))
+                    .ToList();
+
+                _logger.LogDebug("Found {Count} similar items for activity {ItemId}", similarItems.Count, activity.ItemId);
+
+                // Add new recommendations
+                foreach (var item in similarItems)
+                {
+                    var itemId = GetItemId(item);
+                    if (!seenItemIds.Contains(itemId))
+                    {
+                        allRecommendations.Add(item);
+                        seenItemIds.Add(itemId);
+                    }
+                }
+
+                if (allRecommendations.Count >= maxResults * 2)
+                    break;
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to get recommendations from activity for item {ItemId}", activity.ItemId);
+            }
+        }
+
+        return allRecommendations.Take(maxResults).ToList();
+    }
+
+    private async Task<float[]?> GenerateItemVectorAsync<T>(T item, CancellationToken cancellationToken) where T : class
+    {
+        try
+        {
+            // Generate embedding from the item's content, not the activity
+            var itemText = GenerateItemSearchText(item);
+            var embedding = await _embeddingService.GenerateEmbeddingAsync(itemText, cancellationToken: cancellationToken);
+            return embedding.ToArray();
+        }
+        catch (System.Exception ex)
+        {
+            _logger.LogError(ex, "Failed to generate vector for item {ItemId}", GetItemId(item));
             return null;
         }
+    }
+
+    private string GenerateItemSearchText<T>(T item) where T : class
+    {
+        try
+        {
+            // Generate meaningful text from the item properties
+            var properties = typeof(T).GetProperties()
+                .Where(p => (p.PropertyType == typeof(string) || 
+                             p.PropertyType == typeof(int) ||
+                             p.PropertyType == typeof(decimal)) &&
+                            p.CanRead &&
+                            !p.Name.Equals("Id", StringComparison.OrdinalIgnoreCase))
+                .Select(p => 
+                        {
+                            var value = p.GetValue(item);
+                            return value != null ? $"{p.Name.ToLower(CultureInfo.CurrentCulture)}:{value}" : null;
+                        })
+                .Where(v => !string.IsNullOrEmpty(v));
+
+            var result = string.Join(" ", properties);
+        
+            // Fallback to JSON if no meaningful text generated
+            return !string.IsNullOrWhiteSpace(result) ? result : JsonSerializer.Serialize(item);
+        }
+        catch (System.Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to generate search text for item, falling back to JSON");
+            return JsonSerializer.Serialize(item);
+        }
+    }
+
+    private async Task<SearchResult<T>> GetFallbackRecommendations<T>(
+        int maxResults,
+        double similarityThreshold,
+        bool includeExplanation,
+        CancellationToken cancellationToken) where T : class
+    {
+        try
+        {
+            var targetRepository = GetRepository<T>();
+            if (targetRepository == null)
+            {
+                _logger.LogWarning("Repository not found for type: {TypeName}", typeof(T).Name);
+                return new SearchResult<T>();
+            }
+
+            // Get popular items
+            var scoredPoints = await targetRepository.SearchByTextAsync(
+                "popular", 
+                maxResults, 
+                similarityThreshold, 
+                cancellationToken);
+
+            var items = scoredPoints
+                .Select(targetRepository.ExtractEntity)
+                .Where(item => item != null)
+                .ToList();
+
+            return new SearchResult<T>
+            {
+                Results = items,
+                Explanation = includeExplanation
+                    ? $"Here are some popular {typeof(T).Name.Pluralize()} you might like!"
+                    : null,
+                HasExactMatches = items.Any(),
+                TotalCounts = items.Count,
+                AverageSimilarity = CalculateAverageSimilarity(items)
+            };
+        }
+        catch (System.Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get fallback recommendations for type {TypeName}", typeof(T).Name);
+            return new SearchResult<T>();
+        }
+    }
+
+    private string GenerateActivitySearchText(UserActivity activity)
+    {
+        var textParts = new List<string> 
+            {
+                $"user:{activity.UserId}", 
+                $"item:{activity.ItemId}", 
+                $"action:{activity.ActivityType}", 
+                $"weight:{activity.Weight:F1}", 
+                $"time:{activity.Timestamp:yyyy-MM-dd HH:mm}"
+            };
+
+        if (!string.IsNullOrEmpty(activity.Context?.SearchQuery))
+            textParts.Add($"query:{activity.Context.SearchQuery}");
+
+        if (!string.IsNullOrEmpty(activity.Context?.Category))
+            textParts.Add($"category:{activity.Context.Category}");
+
+        if (activity.Context?.Tags?.Any() == true)
+            textParts.Add($"tags:{string.Join(",", activity.Context.Tags)}");
+
+        if (!string.IsNullOrEmpty(activity.Context?.DeviceType))
+            textParts.Add($"device:{activity.Context.DeviceType}");
+
+        if (activity.Context?.Duration.HasValue == true)
+            textParts.Add($"duration:{activity.Context.Duration.Value}s");
+
+        return string.Join(" ", textParts);
     }
 
     private async Task<string?> GenerateRecommendationExplanationAsync<T>(
@@ -219,41 +379,20 @@ public class RecommendationService : IRecommendationService
         try
         {
             var chatHistory = new ChatHistory();
+            var recommendationList = recommendations.Take(3).ToList();
+
+            if (!recommendationList.Any())
+                return "Based on your activity, we found some items you might like!";
 
             chatHistory.AddSystemMessage("""
-                You are a helpful recommendation assistant that explains why certain items are being recommended.
-                Your task is to provide a friendly, natural explanation for the recommendations.
-
-                Guidelines:
-                1. Explain the connection to the user's recent activity
-                2. Be concise but helpful (1-2 sentences)
-                3. Use natural, conversational language
-                4. Mention the type of activity that triggered the recommendations
-                5. Sound excited and encouraging
+                You are a helpful recommendation assistant. Provide a friendly, 1-2 sentence explanation.
+                Be positive and encouraging. Mention the connection to user activity if relevant.
                 """);
 
-            var recommendationsJson = JsonSerializer.Serialize(
-                recommendations.Take(3),
-                new JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                });
-
             chatHistory.AddUserMessage($"""
-                Please provide a helpful explanation for these recommendations.
-
-                User ID: {userId}
-                Source Activity: {sourceActivity.ActivityType} on item {sourceActivity.ItemId}
-
-                Recommended Items (first 3):
-                {recommendationsJson}
-
-                Please provide a concise, friendly explanation that:
-                1. Mentions the user's recent activity
-                2. Explains why these items are being recommended
-                3. Is encouraging and positive
-                4. Keeps it brief (1-2 sentences)
+                User {userId} recently {sourceActivity.ActivityType} an item.
+                We found {recommendationList.Count} recommendations based on their activity.
+                Provide a brief, friendly explanation.
                 """);
 
             var response = await _chatService.GetChatMessageContentAsync(
@@ -264,8 +403,41 @@ public class RecommendationService : IRecommendationService
         catch (System.Exception ex)
         {
             _logger.LogError(ex, "Failed to generate recommendation explanation");
+            return "We found some great items based on your activity!";
+        }
+    }
+
+    private IQdrantRepository<T>? GetRepository<T>() where T : class
+    {
+        try
+        {
+            return _serviceProvider.GetService<IQdrantRepository<T>>();
+        }
+        catch (System.Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get repository for type: {TypeName}", typeof(T).Name);
             return null;
         }
+    }
+
+    private string GetItemId<T>(T item) where T : class
+    {
+        var idProperty = typeof(T).GetProperties()
+            .FirstOrDefault(p => p.Name.Equals("Id", StringComparison.OrdinalIgnoreCase) ||
+                                 p.Name.Equals(typeof(T).Name + "Id", StringComparison.OrdinalIgnoreCase));
+
+        return idProperty?.GetValue(item)?.ToString() ?? "unknown";
+    }
+
+    private bool IsSameItem<T>(T item, string sourceItemId) where T : class
+    {
+        var itemId = GetItemId(item);
+        return string.Equals(itemId, sourceItemId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private double CalculateAverageSimilarity<T>(List<T> items) where T : class
+    {
+        return items.Any() ? 0.8 : 0.0;
     }
 
     private float[] ApplyWeightToVector(float[] vector, double weight)
@@ -275,23 +447,16 @@ public class RecommendationService : IRecommendationService
 
     private double GetActivityWeight(string activityType)
     {
-        return activityType switch
+        return activityType.ToLower(CultureInfo.CurrentCulture) switch
         {
             ActivityTypes.Purchase => 3.0,
-            ActivityTypes.AddToCart => 2.5,
-            ActivityTypes.Bookmark => 2.0,
-            ActivityTypes.Like => 1.8,
-            ActivityTypes.Rating => 1.7,
-            ActivityTypes.Comment => 1.6,
-            ActivityTypes.Click => 1.3,
+            ActivityTypes.Rating => 2.5,
+            ActivityTypes.Review => 2.5,
+            ActivityTypes.Like => 2.0,
+            ActivityTypes.Click => 1.5,
             ActivityTypes.View => 1.0,
+            ActivityTypes.Search => 1.2,
             _ => 1.0
         };
-    }
-
-    private IQdrantRepository<T> GetItemRepository<T>() where T : class
-    {
-        using var scope = _scopeFactory.CreateScope();
-        return scope.ServiceProvider.GetRequiredService<IQdrantRepository<T>>();
     }
 }

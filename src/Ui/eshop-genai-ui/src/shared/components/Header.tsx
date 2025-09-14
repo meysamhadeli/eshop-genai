@@ -9,7 +9,7 @@ export default function Header() {
   const { data: basket, isError, isLoading } = useQuery({
     queryKey: ['basket'],
     queryFn: () => fetchBasket('user-123').then(res => res.data),
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: false, // Disable auto-refetch on window focus
     staleTime: 1000 * 60, // 1 minute
     retry: 1,
   })

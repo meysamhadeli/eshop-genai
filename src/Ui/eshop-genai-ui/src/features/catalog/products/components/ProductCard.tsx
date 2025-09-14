@@ -3,15 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ProductDto } from '@/features/catalog/products/models/ProductDto'
 import fallbackImg from '@/assets/images/default_product.jpg';
 import { updateBasketItem } from '@/features/basket/baskets/services/basket-service';
-
-// Price formatting utility (can be moved to a shared utils file if used elsewhere)
-const formatPrice = (price: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'decimal',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(price);
-};
+import { formatCurrency } from '@/shared/lib/currency';
 
 interface Props {
   product: ProductDto
@@ -61,7 +53,7 @@ export default function ProductCard({ product }: Props) {
           <h3 className="font-semibold text-lg text-gray-800 line-clamp-1">{product.name}</h3>
           <p className="text-gray-600 text-sm line-clamp-2 mt-1">{product.description}</p>
           <p className="text-amazon-dark font-bold mt-2 text-lg">
-            ${formatPrice(product.price)}
+            ${formatCurrency(product.price)}
           </p>
         </div>
       </Link>

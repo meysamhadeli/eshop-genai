@@ -220,9 +220,15 @@ var ollama = builder.AddOllama("ollama")
     .WithEndpoint(port: 11434, targetPort: 11434, name: "http", isProxied: true, isExternal: false)
     .WithGPUSupport()
     .WithDataVolume("ollama-data")
-    .WithLifetime(ContainerLifetime.Persistent)
-    .AddModel("nomic-embed-text");
+    .WithEnvironment("OLLAMA_THINKING", "false");
 
+ollama.AddModel("nomic-embed-text");
+ollama.AddModel("qwen3:0.6b");
+
+if (builder.ExecutionContext.IsPublishMode)
+{
+    ollama.WithLifetime(ContainerLifetime.Persistent);
+}
 
 var qdrant = builder.AddQdrant("qdrant")
     .WithEndpoint(port: 6333, targetPort: 6333, name: "http", isProxied: true, isExternal: false)

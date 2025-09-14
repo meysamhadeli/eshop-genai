@@ -5,6 +5,7 @@ import ProductDetailPage from '@/features/catalog/products/pages/ProductDetailPa
 
 export const routes: RouteObject[] = [
   { path: '/', element: <ProductsPage /> },
+  { path: '/search', element: <ProductsPage /> },
   { path: '/product/:id', element: <ProductDetailPage /> },
   { path: '/basket', element: <BasketPage /> },
 ]

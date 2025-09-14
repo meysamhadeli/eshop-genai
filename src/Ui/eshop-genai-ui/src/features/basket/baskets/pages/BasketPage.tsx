@@ -17,6 +17,7 @@ export default function BasketPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['basket'],
     queryFn: () => fetchBasket('user-123').then(res => res.data),
+    refetchOnWindowFocus: false, // Disable auto-refetch on window focus
     initialData: {
       id: '',
       userId: 'user-123',

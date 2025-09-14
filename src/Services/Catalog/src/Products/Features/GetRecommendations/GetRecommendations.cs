@@ -1,11 +1,12 @@
 using BuildingBlocks.AI.Recommendation;
-using BuildingBlocks.AI.SemanticSearch;
 using BuildingBlocks.Core.Pagination;
 using BuildingBlocks.Web;
 using Catalog.Products.Dtos;
+using Catalog.Products.Models;
+using Mapster;
 using MediatR;
 
-namespace Catalog.Products.Features.GetRecommendationsByActivityType;
+namespace Catalog.Products.Features.GetRecommendations;
 
 public record GetRecommendationsRequest(int PageNumber = 1, int PageSize = 10);
 
@@ -27,16 +28,18 @@ public class GetRecommendationsByActivityTypeHandler : IRequestHandler<GetRecomm
 
     public async Task<PageList<ProductDto>> Handle(GetRecommendations request, CancellationToken cancellationToken)
     {
-        var recommendations = await _recommendationService.GetRecommendationsAsync<ProductDto>(
+        var recommendations = await _recommendationService.GetRecommendationsAsync<ProductReadModel>(
             request.UserId,
             request.PageSize,
             cancellationToken: cancellationToken);
 
         return new PageList<ProductDto>(
-            recommendations.Results.ToList(),
-            recommendations.TotalCounts,
+            recommendations.Results?.Adapt<List<ProductDto>>() ?? new List<ProductDto>(),
             request.PageNumber,
-            request.PageSize);
+            request.PageSize,
+            recommendations.TotalCounts,
+            recommendations.HasExactMatches,
+            recommendations?.Explanation);
     }
 }
 
@@ -44,7 +47,7 @@ public class GetRecommendationsEndpoints : IMinimalEndpoint
 {
     public IEndpointRouteBuilder MapEndpoint(IEndpointRouteBuilder builder)
     {
-        builder.MapGet($"{EndpointConfig.BaseApiPath}/recommendations/{{userId}}", async (
+        builder.MapGet($"{EndpointConfig.BaseApiPath}/product/recommendations/{{userId}}", async (
             string userId,
             [AsParameters] GetRecommendationsRequest query,
             IMediator mediator,
