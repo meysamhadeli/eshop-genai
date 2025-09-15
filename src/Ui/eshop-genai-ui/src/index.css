@@ -43,3 +43,39 @@ a:hover {
     opacity: .5;
   }
 }
+
+/* Hide scrollbar for horizontal scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+/* Smooth scrolling behavior */
+.scroll-smooth {
+  scroll-behavior: smooth;
+}
+
+/* Recommendation arrow hover effects */
+.recommendation-arrow {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.recommendation-arrow:hover {
+  transform: scale(1.1);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Ensure proper spacing for horizontal scroll */
+.-mx-4 {
+  margin-left: -1rem;
+  margin-right: -1rem;
+}
+
+.px-4 {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}

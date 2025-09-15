@@ -1,20 +1,21 @@
 import { useQuery } from '@tanstack/react-query'
 import ProductCard from '@/features/catalog/products/components/ProductCard'
-import { FiRefreshCw } from 'react-icons/fi'
+import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { getRecommendations } from '@/features/catalog/products/services/product-service'
+import { useState, useRef } from 'react'
 
 interface RecommendationSectionProps {
   userId: string
   title?: string
   maxItems?: number
-  showRefresh?: boolean
+  showPagination?: boolean
 }
 
 // Skeleton component for loading state
 const RecommendationSkeleton = ({ count = 4 }: { count?: number }) => (
-  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+  <div className="flex gap-6 overflow-hidden">
     {Array.from({ length: count }).map((_, index) => (
-      <div key={index} className="animate-pulse">
+      <div key={index} className="flex-shrink-0 w-64 animate-pulse">
         <div className="aspect-square bg-gradient-to-r from-gray-100 to-gray-200 rounded-lg mb-4"></div>
         <div className="h-4 bg-gradient-to-r from-gray-100 to-gray-200 rounded mb-2"></div>
         <div className="h-3 bg-gradient-to-r from-gray-100 to-gray-200 rounded w-3/4"></div>
@@ -28,60 +29,48 @@ export default function RecommendationSection({
   userId,
   title = "Recommended For You",
   maxItems = 8,
-  showRefresh = true
+  showPagination = true
 }: RecommendationSectionProps) {
-  const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ['recommendations', userId],
-    queryFn: () => getRecommendations(userId, 1, maxItems).then(res => res.data),
+  const [currentPage, setCurrentPage] = useState(1)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  const { data, isLoading, error, isFetching } = useQuery({
+    queryKey: ['recommendations', userId, currentPage],
+    queryFn: () => getRecommendations(userId, currentPage, maxItems).then(res => res.data),
     refetchOnWindowFocus: false,
     enabled: !!userId,
     staleTime: 1000 * 60 * 5,
   })
 
-  const handleRefresh = () => {
-    refetch()
+  const scrollLeft = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: -300, behavior: 'smooth' })
+    }
   }
 
-  // Show shimmer effect when fetching new data
-  if (isFetching && !isLoading) {
-    return (
-      <section className="my-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
-          {showRefresh && (
-            <button
-              onClick={handleRefresh}
-              disabled={true}
-              className="flex items-center gap-2 px-3 py-1 text-sm text-gray-400 border border-gray-200 rounded"
-            >
-              <FiRefreshCw className="w-4 h-4 animate-spin" />
-              Refreshing...
-            </button>
-          )}
-        </div>
-        <div className="relative overflow-hidden">
-          <RecommendationSkeleton count={maxItems} />
-          <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
-        </div>
-      </section>
-    )
+  const scrollRight = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: 300, behavior: 'smooth' })
+    }
   }
+
+  const handleNextPage = () => {
+    setCurrentPage(prev => prev + 1)
+  }
+
+  const handlePrevPage = () => {
+    setCurrentPage(prev => Math.max(1, prev - 1))
+  }
+
+  const totalPages = data ? Math.ceil(data.totalCount / maxItems) : 1
+  const hasNextPage = currentPage < totalPages
+  const hasPrevPage = currentPage > 1
 
   if (isLoading) {
     return (
       <section className="my-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
-          {showRefresh && (
-            <button
-              onClick={handleRefresh}
-              disabled={true}
-              className="flex items-center gap-2 px-3 py-1 text-sm text-gray-400 border border-gray-200 rounded"
-            >
-              <FiRefreshCw className="w-4 h-4" />
-              Refresh
-            </button>
-          )}
         </div>
         <RecommendationSkeleton count={maxItems} />
       </section>
@@ -101,32 +90,115 @@ export default function RecommendationSection({
     <section className="my-8">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
-        {showRefresh && (
-          <button
-            onClick={handleRefresh}
-            className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-          >
-            <FiRefreshCw className="w-4 h-4" />
-            Refresh
-          </button>
+        {showPagination && totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrevPage}
+              disabled={!hasPrevPage || isFetching}
+              className="
+                w-8 h-8 flex items-center justify-center
+                bg-white border border-gray-300 rounded-full
+                text-gray-600 hover:text-gray-800 hover:bg-gray-50
+                disabled:opacity-30 disabled:cursor-not-allowed
+                transition-all duration-200 shadow-sm
+                hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500
+              "
+              aria-label="Previous page"
+            >
+              <FiChevronLeft className="w-5 h-5" />
+            </button>
+            
+            <span className="text-sm text-gray-600 mx-1">
+              {currentPage} / {totalPages}
+            </span>
+            
+            <button
+              onClick={handleNextPage}
+              disabled={!hasNextPage || isFetching}
+              className="
+                w-8 h-8 flex items-center justify-center
+                bg-white border border-gray-300 rounded-full
+                text-gray-600 hover:text-gray-800 hover:bg-gray-50
+                disabled:opacity-30 disabled:cursor-not-allowed
+                transition-all duration-200 shadow-sm
+                hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500
+              "
+              aria-label="Next page"
+            >
+              <FiChevronRight className="w-5 h-5" />
+            </button>
+          </div>
         )}
       </div>
 
       {data.explanation && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-800 italic">"{data.explanation}"</p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {data.items.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
+      {/* Horizontal Scrolling Container with Arrows */}
+      <div className="relative group">
+        {/* Left Arrow */}
+        <button
+          onClick={scrollLeft}
+          className="
+            absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-4
+            w-12 h-12 flex items-center justify-center
+            bg-white border border-gray-300 rounded-full
+            text-gray-600 hover:text-gray-800 hover:bg-gray-50
+            shadow-xl hover:shadow-2xl
+            transition-all duration-300 z-20
+            focus:outline-none focus:ring-4 focus:ring-blue-200
+            opacity-0 group-hover:opacity-100
+            hidden md:flex
+          "
+          aria-label="Scroll left"
+        >
+          <FiChevronLeft className="w-6 h-6" />
+        </button>
+
+        {/* Right Arrow */}
+        <button
+          onClick={scrollRight}
+          className="
+            absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-4
+            w-12 h-12 flex items-center justify-center
+            bg-white border border-gray-300 rounded-full
+            text-gray-600 hover:text-gray-800 hover:bg-gray-50
+            shadow-xl hover:shadow-2xl
+            transition-all duration-300 z-20
+            focus:outline-none focus:ring-4 focus:ring-blue-200
+            opacity-0 group-hover:opacity-100
+            hidden md:flex
+          "
+          aria-label="Scroll right"
+        >
+          <FiChevronRight className="w-6 h-6" />
+        </button>
+
+        {/* Horizontal Scrolling Products */}
+        <div
+          ref={scrollContainerRef}
+          className="
+            flex gap-6 overflow-x-auto pb-4
+            scrollbar-hide
+            scroll-smooth
+            -mx-4 px-4
+          "
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {data.items.map((product) => (
+            <div key={product.id} className="flex-shrink-0 w-64">
+              <ProductCard product={product} />
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="mt-4 text-center">
         <p className="text-sm text-gray-500">
-          Based on your activity and preferences
+          Based on your activity and preferences • Page {currentPage} of {totalPages}
         </p>
       </div>
     </section>

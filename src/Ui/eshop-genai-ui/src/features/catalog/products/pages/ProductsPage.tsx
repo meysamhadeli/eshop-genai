@@ -5,12 +5,16 @@ import RecommendationSection from '@/features/catalog/products/components/Recomm
 export default function ProductsPage() {
   const location = useLocation()
   const userId = 'user-123'
-  const isHomePage = !location.search.includes('q=')
-
+  
+  // Only show recommendations on home page (no search term, no pagination)
+  const isHomePage = location.pathname === '/' && 
+                    !location.search.includes('q=') && 
+                    !location.search.includes('page=') &&
+                    location.search === ''
 
   return (
     <div>      
-      {/* Main product list - shows all products on home page, search results on search */}
+      {/* Main product list */}
       <ProductList />
       
       {/* Recommendations section at the bottom - only on home page */}

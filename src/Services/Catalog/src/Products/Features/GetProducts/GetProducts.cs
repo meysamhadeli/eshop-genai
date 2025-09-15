@@ -88,9 +88,9 @@ public class GetProductsHandler : IRequestHandler<GetProducts, PageList<ProductD
 
         return PageList<ProductDto>.Create(
             productDtos,
-            totalCount,
             request.PageNumber,
-            request.PageSize);
+            request.PageSize,
+            totalCount);
     }
 }
 
