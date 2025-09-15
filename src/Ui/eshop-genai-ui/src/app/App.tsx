@@ -1,33 +1,34 @@
-// App.tsx
-import { RouterProvider, createBrowserRouter } from 'react-router-dom'
-import { routes } from '@/app/routes'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Layout from '@/shared/components/Layout'
-import { ToastContainer } from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
+import ProductsPage from '@/features/catalog/products/pages/ProductsPage'
+import ProductDetailPage from '@/features/catalog/products/pages/ProductDetailPage'
+import BasketPage from '@/features/basket/baskets/pages/BasketPage'
 
-const router = createBrowserRouter(
-  routes.map(route => ({
-    ...route,
-    element: <Layout>{route.element}</Layout>,
-  }))
-)
 
 function App() {
   return (
-    <>
-      <RouterProvider router={router} />
-      <ToastContainer
-        position="top-right"
-        autoClose={5000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-      />
-    </>
+    <Router>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<ProductsPage />} />
+          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/search" element={<ProductsPage />} />
+          <Route path="/product/:id" element={<ProductDetailPage />} />
+          <Route path="/basket" element={<BasketPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Layout>
+    </Router>
+  )
+}
+
+// Simple 404 component
+function NotFound() {
+  return (
+    <div className="text-center py-20">
+      <h1 className="text-2xl font-bold text-gray-800 mb-4">404 - Page Not Found</h1>
+      <p className="text-gray-600">The page you're looking for doesn't exist.</p>
+    </div>
   )
 }
 
