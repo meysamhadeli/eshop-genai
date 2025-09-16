@@ -4,7 +4,6 @@ using BuildingBlocks.Core;
 using BuildingBlocks.Web;
 using Catalog;
 using Mapster;
-using MapsterMapper;
 using MediatR;
 using Order.Data;
 using Order.Orders.Dtos;
@@ -20,20 +19,17 @@ public class CreateOrderCommandHandler : IRequestHandler<CreateOrder, OrderDto>
     private readonly OrderDbContext _orderDbContext;
     private readonly BasketGrpcService.BasketGrpcServiceClient _basketGrpcServiceClient;
     private readonly CatalogGrpcService.CatalogGrpcServiceClient _catalogGrpcServiceClient;
-    private readonly IMapper _mapper;
     private readonly IIntegrationEventCollector _integrationEventCollector;
 
     public CreateOrderCommandHandler(
         OrderDbContext orderDbContext,
         BasketGrpcService.BasketGrpcServiceClient basketGrpcServiceClient,
         CatalogGrpcService.CatalogGrpcServiceClient catalogGrpcServiceClient,
-        IMapper mapper,
         IIntegrationEventCollector integrationEventCollector)
     {
         _orderDbContext = orderDbContext;
         _basketGrpcServiceClient = basketGrpcServiceClient;
         _catalogGrpcServiceClient = catalogGrpcServiceClient;
-        _mapper = mapper;
         _integrationEventCollector = integrationEventCollector;
     }
 
@@ -90,7 +86,7 @@ public class CreateOrderCommandHandler : IRequestHandler<CreateOrder, OrderDto>
 
         await _basketGrpcServiceClient.ClearBasketAsync(new ClearBasketRequest { UserId = request.UserId }, cancellationToken: cancellationToken);
 
-        return _mapper.Map<OrderDto>(order);
+        return order.Adapt<OrderDto>();
     }
 }
 

@@ -3,6 +3,7 @@ using BuildingBlocks.Contracts.EventBus.Messages;
 using Catalog.Data;
 using Catalog.Products.Exceptions;
 using Catalog.Products.Models;
+using Mapster;
 using MapsterMapper;
 using MassTransit;
 using MongoDB.Driver;
@@ -13,14 +14,11 @@ namespace Catalog.Products.Features.AddProduct;
 public class AddProductMongoHandler : IConsumer<ProductAddedIntegrationEvent>
 {
     private readonly CatalogReadDbContext _catalogReadDbContext;
-    private readonly IMapper _mapper;
 
     public AddProductMongoHandler(
-        IMapper mapper,
         CatalogReadDbContext catalogReadDbContext
     )
     {
-        _mapper = mapper;
         _catalogReadDbContext = catalogReadDbContext;
     }
 
@@ -28,7 +26,7 @@ public class AddProductMongoHandler : IConsumer<ProductAddedIntegrationEvent>
     {
         Guard.Against.Null(context, nameof(context));
 
-        var productReadModel = _mapper.Map<ProductReadModel>(context.Message);
+        var productReadModel = context.Message.Adapt<ProductMongoModel>();
 
         var product = await _catalogReadDbContext.Product.AsQueryable()
                           .FirstOrDefaultAsync(x => x.Id == productReadModel.Id && !x.IsDeleted, context.CancellationToken);

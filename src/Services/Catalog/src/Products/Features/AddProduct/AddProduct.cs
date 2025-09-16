@@ -5,6 +5,7 @@ using BuildingBlocks.Web;
 using Catalog.Data;
 using Catalog.Products.Dtos;
 using Catalog.Products.Models;
+using Mapster;
 using MapsterMapper;
 using MediatR;
 
@@ -20,13 +21,11 @@ public record AddProduct(
 public class AddProductCommandHandler : IRequestHandler<AddProduct, ProductDto>
 {
     private readonly CatalogDbContext _context;
-    private readonly IMapper _mapper;
     private readonly IIntegrationEventCollector _integrationEventCollector;
 
     public AddProductCommandHandler(CatalogDbContext context, IMapper mapper, IIntegrationEventCollector integrationEventCollector)
     {
         _context = context;
-        _mapper = mapper;
         _integrationEventCollector = integrationEventCollector;
     }
 
@@ -46,7 +45,7 @@ public class AddProductCommandHandler : IRequestHandler<AddProduct, ProductDto>
 
         _integrationEventCollector.AddIntegrationEvent(new ProductAddedIntegrationEvent(product.Id, product.Name, product.Description, product.Price, product.ImageUrl, false));
 
-        return _mapper.Map<ProductDto>(product);
+        return  product.Adapt<ProductDto>();
     }
 }
 

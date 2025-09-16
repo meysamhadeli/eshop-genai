@@ -26,6 +26,7 @@
     <ProjectReference Include="..\..\..\Services\Basket\src\Basket.csproj" />
     <ProjectReference Include="..\..\..\Services\Catalog\src\Catalog.csproj" />
     <ProjectReference Include="..\..\..\Services\Order\src\Order.csproj" />
+    <ProjectReference Include="..\..\..\Services\Recommendation\src\Recommendation.csproj" />
   </ItemGroup>
 
 </Project>

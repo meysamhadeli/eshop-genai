@@ -10,8 +10,8 @@ public class CatalogReadDbContext : MongoDbContext
 {
     public CatalogReadDbContext(IOptions<MongoOptions> options) : base(options)
     {
-        Product = GetCollection<ProductReadModel>(nameof(Product).Underscore());
+        Product = GetCollection<ProductMongoModel>(nameof(Product).Underscore());
     }
 
-    public IMongoCollection<ProductReadModel> Product { get; }
+    public IMongoCollection<ProductMongoModel> Product { get; }
 }

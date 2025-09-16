@@ -1,12 +1,13 @@
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { fetchProductById, trackUserActivity } from '@/features/catalog/products/services/product-service'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useRef } from 'react'
 import type { ProductDto } from '@/features/catalog/products/models/ProductDto'
 import { fetchBasket, updateBasketItem } from '@/features/basket/baskets/services/basket-service'
 import { formatCurrency } from '@/shared/lib/currency'
 import fallbackImg from '@/assets/images/default_product.jpg'
+import { trackUserActivity } from '@/features/recomendation/recomendations/services/recommendation-service'
+import { fetchProductById } from '@/features/catalog/products/services/product-service'
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>()

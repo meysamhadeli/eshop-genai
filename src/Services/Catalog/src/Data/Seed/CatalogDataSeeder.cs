@@ -1,11 +1,7 @@
-// Update CatalogDataSeeder.cs
-
 using BuildingBlocks.AI.Qdrant;
-using BuildingBlocks.AI.SemanticSearch;
 using BuildingBlocks.EFCore;
-using Catalog.Products.Dtos;
 using Catalog.Products.Models;
-using MapsterMapper;
+using Mapster;
 using Microsoft.EntityFrameworkCore;
 using MongoDB.Driver;
 using MongoDB.Driver.Linq;
@@ -15,20 +11,17 @@ namespace Catalog.Data.Seed;
 public class CatalogDataSeeder : IDataSeeder
 {
     private readonly CatalogDbContext _catalogDbContext;
-    private readonly IMapper _mapper;
     private readonly ILogger<CatalogDataSeeder> _logger;
     private readonly CatalogReadDbContext _catalogReadDbContext;
-    private readonly IQdrantRepository<ProductReadModel> _qdrantRepository;
+    private readonly IQdrantRepository<ProductQdrantModel> _qdrantRepository;
 
     public CatalogDataSeeder(
         CatalogDbContext catalogDbContext,
-        IMapper mapper,
         ILogger<CatalogDataSeeder> logger,
         CatalogReadDbContext catalogReadDbContext,
-        IQdrantRepository<ProductReadModel> qdrantRepository)
+        IQdrantRepository<ProductQdrantModel> qdrantRepository)
     {
         _catalogDbContext = catalogDbContext;
-        _mapper = mapper;
         _logger = logger;
         _catalogReadDbContext = catalogReadDbContext;
         _qdrantRepository = qdrantRepository;
@@ -60,24 +53,24 @@ public class CatalogDataSeeder : IDataSeeder
     {
         if (!await MongoQueryable.AnyAsync(_catalogReadDbContext.Product.AsQueryable()))
         {
-            await _catalogReadDbContext.Product.InsertManyAsync(_mapper.Map<List<ProductReadModel>>(InitialData.Products));
+            await _catalogReadDbContext.Product.InsertManyAsync(InitialData.Products.Adapt<List<ProductMongoModel>>());
         }
     }
 
     private async Task SeedQdrantProductsAsync()
     {
         var products = await EntityFrameworkQueryableExtensions.ToListAsync(_catalogDbContext.Products);
-        var productReadModels = _mapper.Map<List<ProductReadModel>>(products);
+        var productQdrantModels = products.Adapt<List<ProductQdrantModel>>();
 
-        foreach (var productReadModel in productReadModels)
+        foreach (var productQdrantModel in productQdrantModels)
         {
             try
             {
-                await _qdrantRepository.IndexAsync(productReadModel);
+                await _qdrantRepository.IndexAsync(productQdrantModel);
             }
             catch (Exception ex)
             {
-                _logger.LogError("Failed to index product in Qdrant for {ProductReadModel}: {ExMessage}", productReadModel.Id, ex.Message);
+                _logger.LogError("Failed to index product in Qdrant for {ProductReadModel}: {ExMessage}", productQdrantModel.Id, ex.Message);
             }
         }
     }

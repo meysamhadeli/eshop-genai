@@ -3,32 +3,29 @@ using BuildingBlocks.AI.Qdrant;
 using BuildingBlocks.Contracts.EventBus.Messages;
 using Catalog.Products.Exceptions;
 using Catalog.Products.Models;
-using MapsterMapper;
+using Mapster;
 using MassTransit;
 
 namespace Catalog.Products.Features.AddProduct;
 
 public class AddProductQdrantHandler : IConsumer<ProductAddedIntegrationEvent>
 {
-    private readonly IQdrantRepository<ProductReadModel> _qdrantRepository;
-    private readonly IMapper _mapper;
+    private readonly IQdrantRepository<ProductQdrantModel> _qdrantRepository;
 
     public AddProductQdrantHandler(
-        IQdrantRepository<ProductReadModel> qdrantRepository,
-        IMapper mapper
+        IQdrantRepository<ProductQdrantModel> qdrantRepository
     )
     {
         _qdrantRepository = qdrantRepository;
-        _mapper = mapper;
     }
 
     public async Task Consume(ConsumeContext<ProductAddedIntegrationEvent> context)
     {
         Guard.Against.Null(context, nameof(context));
 
-        var productReadModel = _mapper.Map<ProductReadModel>(context.Message);
+        var productQdrantModel = context.Message.Adapt<ProductQdrantModel>();
 
-        var product = await _qdrantRepository.GetByIdAsync(productReadModel.Id, cancellationToken: context.CancellationToken);
+        var product = await _qdrantRepository.GetByIdAsync(productQdrantModel.Id, cancellationToken: context.CancellationToken);
 
         if (product is not null)
         {

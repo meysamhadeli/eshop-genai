@@ -1,6 +1,6 @@
 import ProductList from '@/features/catalog/products/components/ProductList'
+import RecommendationSection from '@/features/recomendation/recomendations/components/RecommendationSection'
 import { useLocation } from 'react-router-dom'
-import RecommendationSection from '@/features/catalog/products/components/RecommendationSection'
 
 export default function ProductsPage() {
   const location = useLocation()
@@ -24,7 +24,6 @@ export default function ProductsPage() {
             userId={userId} 
             title="Recommended For You"
             maxItems={8}
-            showRefresh={true}
           />
         </div>
       )}

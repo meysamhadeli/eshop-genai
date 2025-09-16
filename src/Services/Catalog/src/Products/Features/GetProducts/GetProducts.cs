@@ -1,11 +1,10 @@
-using BuildingBlocks.AI.Qdrant;
 using BuildingBlocks.AI.SemanticSearch;
 using BuildingBlocks.Core.Pagination;
 using BuildingBlocks.Web;
 using Catalog.Data;
 using Catalog.Products.Dtos;
 using Catalog.Products.Models;
-using MapsterMapper;
+using Mapster;
 using MediatR;
 using MongoDB.Driver;
 using MongoDB.Driver.Linq;
@@ -20,16 +19,13 @@ public record GetProducts(
 
 public class GetProductsHandler : IRequestHandler<GetProducts, PageList<ProductDto>>
 {
-    private readonly IMapper _mapper;
     private readonly CatalogReadDbContext _catalogReadDbContext;
     private readonly ISemanticSearchService _semanticSearchService;
 
     public GetProductsHandler(
-        IMapper mapper,
         CatalogReadDbContext catalogReadDbContext,
         ISemanticSearchService semanticSearchService)
     {
-        _mapper = mapper;
         _catalogReadDbContext = catalogReadDbContext;
         _semanticSearchService = semanticSearchService;
     }
@@ -40,14 +36,14 @@ public class GetProductsHandler : IRequestHandler<GetProducts, PageList<ProductD
     {
         if (request.UseSemanticSearch && !string.IsNullOrEmpty(request.SearchTerm))
         {
-            var semanticResults = await _semanticSearchService.SemanticSearchAsync<ProductReadModel>(
+            var semanticResults = await _semanticSearchService.SemanticSearchAsync<ProductQdrantModel>(
                 request.SearchTerm,
                 maxResults: request.PageSize,
                 cancellationToken: cancellationToken);
 
             if (semanticResults.Results.Any())
             {
-                var productDtos = _mapper.Map<IReadOnlyList<ProductDto>>(semanticResults.Results);
+                var productDtos = semanticResults.Results.Adapt<IReadOnlyList<ProductDto>>();
 
                 return PageList<ProductDto>.Create(
                     productDtos,
@@ -84,7 +80,7 @@ public class GetProductsHandler : IRequestHandler<GetProducts, PageList<ProductD
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
-        var productDtos = _mapper.Map<List<ProductDto>>(products);
+        var productDtos = products.Adapt<List<ProductDto>>();
 
         return PageList<ProductDto>.Create(
             productDtos,

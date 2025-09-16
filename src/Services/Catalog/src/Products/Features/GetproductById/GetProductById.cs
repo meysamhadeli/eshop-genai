@@ -3,6 +3,7 @@ using BuildingBlocks.Web;
 using Catalog.Data;
 using Catalog.Products.Dtos;
 using Catalog.Products.Exceptions;
+using Mapster;
 using MapsterMapper;
 using MediatR;
 using MongoDB.Driver;
@@ -15,12 +16,10 @@ public record GetProductById(Guid ProductId) : IRequest<ProductDto>;
 public class GetProductByIdHandler : IRequestHandler<GetProductById, ProductDto>
 {
     private readonly CatalogReadDbContext _catalogReadDbContext;
-    private readonly IMapper _mapper;
 
     public GetProductByIdHandler(CatalogDbContext context, IMapper mapper, CatalogReadDbContext catalogReadDbContext)
     {
         _catalogReadDbContext = catalogReadDbContext;
-        _mapper = mapper;
     }
 
     public async Task<ProductDto> Handle(GetProductById request, CancellationToken cancellationToken)
@@ -32,7 +31,7 @@ public class GetProductByIdHandler : IRequestHandler<GetProductById, ProductDto>
             throw new ProductNotFoundException();
         }
 
-        var productDto = _mapper.Map<ProductDto>(product);
+        var productDto = product.Adapt<ProductDto>();
 
         return productDto;
     }

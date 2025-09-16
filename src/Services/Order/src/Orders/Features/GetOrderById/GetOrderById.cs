@@ -1,5 +1,5 @@
 using BuildingBlocks.Web;
-using MapsterMapper;
+using Mapster;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Order.Data;
@@ -13,12 +13,10 @@ public record GetOrderById(Guid OrderId) : IRequest<OrderDto>;
 public class GetOrderByIdHandler : IRequestHandler<GetOrderById, OrderDto>
 {
     private readonly OrderDbContext _context;
-    private readonly IMapper _mapper;
 
-    public GetOrderByIdHandler(OrderDbContext context, IMapper mapper)
+    public GetOrderByIdHandler(OrderDbContext context)
     {
         _context = context;
-        _mapper = mapper;
     }
 
     public async Task<OrderDto> Handle(GetOrderById request, CancellationToken cancellationToken)
@@ -32,7 +30,7 @@ public class GetOrderByIdHandler : IRequestHandler<GetOrderById, OrderDto>
             throw new OrderNotFoundException();
         }
 
-        return _mapper.Map<OrderDto>(order);
+        return order.Adapt<OrderDto>();
     }
 }
 
