@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import ProductCard from '@/features/catalog/products/components/ProductCard'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
-import { getRecommendations } from '@/features/catalog/products/services/product-service'
 import { useState, useRef } from 'react'
+import { getRecommendations } from '@/features/recomendation/recomendations/services/recommendation-service'
 
 interface RecommendationSectionProps {
   userId: string

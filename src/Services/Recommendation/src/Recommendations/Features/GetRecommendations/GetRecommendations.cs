@@ -1,12 +1,12 @@
 using BuildingBlocks.AI.Recommendation;
 using BuildingBlocks.Core.Pagination;
 using BuildingBlocks.Web;
-using Catalog.Products.Dtos;
-using Catalog.Products.Models;
 using Mapster;
 using MediatR;
+using Recommendation.Recommendations.Dtos;
+using Recommendation.Recommendations.Models;
 
-namespace Catalog.Products.Features.GetRecommendations;
+namespace Recommendation.Recommendations.Features.GetRecommendations;
 
 public record GetRecommendationsRequest(int PageNumber = 1, int PageSize = 10);
 
@@ -28,7 +28,7 @@ public class GetRecommendationsByActivityTypeHandler : IRequestHandler<GetRecomm
 
     public async Task<PageList<ProductDto>> Handle(GetRecommendations request, CancellationToken cancellationToken)
     {
-        var recommendations = await _recommendationService.GetRecommendationsAsync<ProductReadModel>(
+        var recommendations = await _recommendationService.GetRecommendationsAsync<ProductQdrantModel>(
             request.UserId,
             request.PageSize,
             cancellationToken: cancellationToken);
@@ -47,7 +47,7 @@ public class GetRecommendationsEndpoints : IMinimalEndpoint
 {
     public IEndpointRouteBuilder MapEndpoint(IEndpointRouteBuilder builder)
     {
-        builder.MapGet($"{EndpointConfig.BaseApiPath}/product/recommendations/{{userId}}", async (
+        builder.MapGet($"{EndpointConfig.BaseApiPath}/recommendation/{{userId}}", async (
             string userId,
             [AsParameters] GetRecommendationsRequest query,
             IMediator mediator,

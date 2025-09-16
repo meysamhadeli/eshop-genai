@@ -263,6 +263,14 @@ var order = builder.AddProject<Projects.Order>("order-service")
     .WithHttpEndpoint(port: 6020, name: "order-http")
     .WithHttpsEndpoint(port: 5020, name: "order-https");
 
+var recommendation = builder.AddProject<Projects.Recommendation>("recommendation-service")
+    .WithReference(ollama)
+    .WaitFor(ollama)
+    .WithReference(qdrant)
+    .WaitFor(qdrant)
+    .WithHttpEndpoint(port: 6030, name: "order-http")
+    .WithHttpsEndpoint(port: 5030, name: "order-https");
+
 var gateway = builder.AddProject<Projects.ApiGateway>("api-gateway")
     .WithReference(catalog)
     .WaitFor(catalog)
@@ -270,6 +278,8 @@ var gateway = builder.AddProject<Projects.ApiGateway>("api-gateway")
     .WaitFor(basket)
     .WithReference(order)
     .WaitFor(order)
+    .WithReference(recommendation)
+    .WaitFor(recommendation)
     .WithHttpEndpoint(port: 5001, name: "gateway-http")
     .WithHttpsEndpoint(port: 5000, name: "gateway-https");
 

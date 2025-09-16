@@ -7,7 +7,6 @@ using BuildingBlocks.Core;
 using BuildingBlocks.Web;
 using Catalog;
 using Mapster;
-using MapsterMapper;
 using MediatR;
 
 namespace Basket.Baskets.Features;
@@ -21,19 +20,16 @@ public class UpdateItemCommandHandler : IRequestHandler<UpdateItem, BasketDto>
 {
     private readonly IBasketRedisService _basketRedisService;
     private readonly CatalogGrpcService.CatalogGrpcServiceClient _catalogGrpcService;
-    private readonly IMapper _mapper;
     private readonly IIntegrationEventCollector _integrationEventCollector;
     private readonly TimeSpan _basketExpiry = TimeSpan.FromHours(1);
 
     public UpdateItemCommandHandler(
         IBasketRedisService basketRedisService,
         CatalogGrpcService.CatalogGrpcServiceClient catalogGrpcService,
-        IMapper mapper,
         IIntegrationEventCollector integrationEventCollector)
     {
         _basketRedisService = basketRedisService;
         _catalogGrpcService = catalogGrpcService;
-        _mapper = mapper;
         _integrationEventCollector = integrationEventCollector;
     }
 
@@ -96,7 +92,7 @@ public class UpdateItemCommandHandler : IRequestHandler<UpdateItem, BasketDto>
 
         _integrationEventCollector.AddIntegrationEvent(new UpdatedBasketItemsIntegrationEvent(updatedBasket.Id, updatedBasket.UserId, updatedBasket?.Items?.Adapt<ICollection<BasketItemsIntegrationEvent>>(), updatedBasket.ExpirationTime, updatedBasket.IsDeleted));
 
-        return _mapper.Map<BasketDto>(updatedBasket);
+        return updatedBasket.Adapt<BasketDto>();
     }
 }
 

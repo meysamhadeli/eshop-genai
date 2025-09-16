@@ -1,8 +1,8 @@
 using BuildingBlocks.Core.Model;
 
-namespace Catalog.Products.Models;
+namespace Recommendation.Recommendations.Models;
 
-public record ProductReadModel : Entity<Guid>
+public record ProductQdrantModel : Entity<Guid>
 {
     public string Name { get; init; }
     public string Description { get; init; }

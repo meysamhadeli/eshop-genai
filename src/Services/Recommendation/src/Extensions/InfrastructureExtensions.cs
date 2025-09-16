@@ -1,27 +1,18 @@
-using BuildingBlocks.AI;
 using BuildingBlocks.AI.Qdrant;
 using BuildingBlocks.AI.Recommendation;
 using BuildingBlocks.AI.SemanticKernel;
 using BuildingBlocks.AI.SemanticSearch;
-using BuildingBlocks.Caching;
 using BuildingBlocks.Core;
-using BuildingBlocks.EFCore;
-using BuildingBlocks.Exception;
 using BuildingBlocks.Jwt;
 using BuildingBlocks.Mapster;
-using BuildingBlocks.MassTransit;
-using BuildingBlocks.Mongo;
 using BuildingBlocks.OpenApi;
 using BuildingBlocks.ProblemDetails;
 using BuildingBlocks.Web;
-using Catalog.Data;
-using Catalog.Data.Seed;
-using Catalog.GrpcServer.Services;
 using Figgle;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Catalog.Extensions.Infrastructure;
+namespace Recommendation.Extensions;
 
 
 public static class InfrastructureExtensions
@@ -55,31 +46,18 @@ public static class InfrastructureExtensions
         builder.Services.AddProblemDetails();
         builder.Services.AddJwt();
 
-        builder.AddCustomDbContext<CatalogDbContext>(nameof(Catalog));
-        builder.Services.AddScoped<IEventDispatcher, EventDispatcher>();
-        builder.Services.AddScoped<IIntegrationEventCollector, IntegrationEventCollector>();
-        builder.Services.AddScoped<IDataSeeder, CatalogDataSeeder>();
-        builder.Services.AddScoped<ICurrentUserProvider, CurrentUserProvider>();
-        builder.AddMongoDbContext<CatalogReadDbContext>();
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddAspnetOpenApi();
         builder.Services.AddCustomVersioning();
         builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
         builder.Services.AddCustomMapster(typeof(Program).Assembly);
         builder.Services.AddHttpContextAccessor();
-        builder.Services.AddCustomMassTransit(env, TransportType.RabbitMq, typeof(Program).Assembly);
-
-        builder.Services.AddGrpc(options =>
-                                 {
-                                     options.Interceptors.Add<GrpcExceptionInterceptor>();
-                                 });
-
-        builder.Services.AddCustomHybridCaching();
 
         builder.Services.AddQdrant();
 
         builder.Services.AddSemanticKernel()
-            .AddSemanticSearch();
+            .AddSemanticSearch()
+            .AddRecommendationService();
 
         return builder;
     }
@@ -100,8 +78,6 @@ public static class InfrastructureExtensions
 
         app.UseCustomProblemDetails();
         app.UseCorrelationId();
-        app.UseMigration<CatalogDbContext>();
-        app.MapGrpcService<CatalogGrpcServices>();
 
         app.MapGet("/", x => x.Response.WriteAsync(appOptions.Name));
 

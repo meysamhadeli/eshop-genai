@@ -2,7 +2,7 @@ using BuildingBlocks.AI.Recommendation;
 using BuildingBlocks.Web;
 using MediatR;
 
-namespace Catalog.Products.Features.TrackUserActivity;
+namespace Recommendation.Recommendations.Features.TrackUserActivity;
 
 public record TrackUserActivity(
     string UserId,
@@ -45,7 +45,7 @@ public class TrackUserActivityEndpoints : IMinimalEndpoint
 {
     public IEndpointRouteBuilder MapEndpoint(IEndpointRouteBuilder builder)
     {
-        builder.MapPost($"{EndpointConfig.BaseApiPath}/product/recommendations/activity", async (
+        builder.MapPost($"{EndpointConfig.BaseApiPath}/recommendation/activity", async (
             TrackUserActivity command,
             IMediator mediator,
             CancellationToken cancellationToken) =>
