@@ -52,7 +52,7 @@ public static class InfrastructureExtensions
         builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
         builder.Services.AddCustomMapster(typeof(Program).Assembly);
         builder.Services.AddHttpContextAccessor();
-        
+
         builder.Services.AddQdrant();
 
         builder.Services.AddSemanticKernel()

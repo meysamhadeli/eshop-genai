@@ -45,7 +45,7 @@ public class AddProductCommandHandler : IRequestHandler<AddProduct, ProductDto>
 
         _integrationEventCollector.AddIntegrationEvent(new ProductAddedIntegrationEvent(product.Id, product.Name, product.Description, product.Price, product.ImageUrl, false));
 
-        return  product.Adapt<ProductDto>();
+        return product.Adapt<ProductDto>();
     }
 }
 
